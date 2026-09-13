@@ -14,19 +14,9 @@ services:
       interval: 5s
       retries: 10
 
-  agent:
-    build: .
-    restart: unless-stopped
-    depends_on:
-      db: { condition: service_healthy }
-    env_file: .env
-    environment:
-      DATABASE_URL: postgres://jobagent:jobagent@db:5432/jobagent
-    volumes:
-      - ./config:/app/config
-      - ./out:/app/out
-    command: node src/index.js
-
+  # One service, not two: web/server.js owns the UI, the routine search (cron read
+  # from config/settings.json, editable in Settings) and the manual "search" button.
+  # The old `agent` service ran src/index.js, which no longer exists.
   web:
     build: .
     restart: unless-stopped

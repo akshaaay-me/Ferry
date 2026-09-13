@@ -15,6 +15,8 @@ const SETTINGS_KEYS = [
   'provider', 'base_url', 'api_key', 'model',
   'anthropic_api_key', 'anthropic_model',
   'score_model', 'tailor_model', 'voyage_api_key',
+  'telegram_bot_token', 'telegram_chat_id', 'notify_email',
+  'schedule_cron', 'schedule_enabled',
 ];
 
 /**

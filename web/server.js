@@ -1,12 +1,18 @@
 import express from 'express';
+import cron from 'node-cron';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { q, pool } from '../src/db.js';
+import { q, pool, migrate } from '../src/db.js';
 import { tailor } from '../src/resume/tailor.js';
 import { render } from '../src/resume/render.js';
 import { baselineSelection } from '../src/resume/baseline.js';
 import { prepInterview } from '../src/interview/prep.js';
+import { draftEmail } from '../src/outreach/email.js';
+import { ingest } from '../src/pipeline/ingest.js';
+import { prefilter } from '../src/pipeline/prefilter.js';
+import { scoreAll } from '../src/pipeline/score.js';
+import { notify, telegram } from '../src/pipeline/notify.js';
 import { loadProfile, saveProfile, env, PIPELINE_STATUSES } from '../src/config.js';
 import { chat, loadSettings, saveSettings } from '../src/llm.js';
 
@@ -186,6 +192,17 @@ app.post('/api/jobs/:id/tailor', async (req, res) => {
   }
 });
 
+// Draft-only. Returns text for you to read, edit and send from your own mail
+// client - the server has no mail transport and never sends anything.
+app.post('/api/jobs/:id/email', async (req, res) => {
+  try {
+    const draft = await draftEmail(Number(req.params.id));
+    res.json({ ok: true, to: draft.to_suggestion, subject: draft.subject, body: draft.body });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Profile (resume content) ---
 
 app.get('/api/profile', async (_req, res) => {
@@ -204,7 +221,10 @@ app.put('/api/profile', async (req, res) => {
     ...body.experience.flatMap((e) => (e.bullets || []).map((b) => b.id)),
     ...body.projects.map((p) => p.id),
   ];
-  if (new Set(ids).size !== ids.length) return res.status(400).json({ error: 'duplicate bullet/project id' });
+  // Name the offender. A bare "duplicate id" was unfixable from the UI: the save
+  // failed, the page kept the edits, and nothing said which of ~40 ids collided.
+  const dup = ids.find((id, i) => ids.indexOf(id) !== i);
+  if (dup) return res.status(400).json({ error: `duplicate bullet/project id: ${dup}` });
   res.json({ ok: true, profile: await saveProfile(body) });
 });
 
@@ -234,7 +254,13 @@ app.get('/api/settings', async (_req, res) => {
 });
 
 app.put('/api/settings', async (req, res) => {
-  res.json({ ok: true, settings: await saveSettings(req.body || {}) });
+  const body = req.body || {};
+  if (body.schedule_cron && !cron.validate(body.schedule_cron)) {
+    return res.status(400).json({ error: `not a valid cron expression: ${body.schedule_cron}` });
+  }
+  const settings = await saveSettings(body);
+  await reschedule();          // takes effect immediately - no restart
+  res.json({ ok: true, settings, schedule: scheduled });
 });
 
 app.post('/api/settings/test', async (_req, res) => {
@@ -251,6 +277,87 @@ app.post('/api/settings/test', async (_req, res) => {
   }
 });
 
+app.post('/api/notify/test', async (_req, res) => {
+  try {
+    const sent = await telegram('<b>Ferry</b> is connected. This is a test notification.');
+    res.json({ ok: true, sent, note: sent ? null : 'no telegram token/chat id set — printed to the server log instead' });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// --- The pipeline: run it now, or on a schedule ---
+// This process owns both. One `npm start` gives you the UI and the routine search;
+// src/cli.js still runs any single stage by hand.
+
+const STEPS = [
+  ['ingest', () => ingest({ concurrency: env.concurrency })],
+  ['prefilter', () => prefilter({ keep: env.keep, floor: env.prefilterFloor })],
+  ['score', () => scoreAll({ concurrency: env.concurrency, threshold: env.scoreThreshold })],
+  ['notify', () => notify({ threshold: env.notifyThreshold })],
+];
+
+// pg's AggregateError (every connection attempt failed) has an EMPTY .message, so
+// a bare err.message renders as "search failed:" with nothing after it - the one
+// failure you most need spelled out. Fall back to the stringified error.
+const reason = (err) => err.message || String(err);
+
+// Single-user app: one in-flight cycle, tracked in a plain object the dashboard polls.
+const run = { running: false, step: null, startedAt: null, finishedAt: null, result: null, error: null };
+
+async function cycle(trigger) {
+  if (run.running) return false;
+  Object.assign(run, { running: true, step: null, startedAt: Date.now(), finishedAt: null, result: null, error: null });
+  console.log(`\n[${new Date().toISOString()}] cycle start (${trigger})`);
+  const t0 = Date.now();
+  const result = {};
+  try {
+    for (const [name, fn] of STEPS) {
+      run.step = name;
+      result[name] = await fn();
+      console.log(`${name.padEnd(10)}`, result[name]);
+    }
+    run.result = result;
+  } catch (err) {
+    console.error('cycle failed:', err);
+    run.error = reason(err);
+    run.result = result;                       // whatever finished before the failure
+  }
+  Object.assign(run, { running: false, step: null, finishedAt: Date.now() });
+  console.log(`cycle done in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  return true;
+}
+
+app.post('/api/run', async (_req, res) => {
+  if (run.running) return res.status(409).json({ error: `already running (${run.step})`, ...run });
+  cycle('manual');                              // fire and forget; poll /api/run/status
+  res.json({ ok: true, started: true });
+});
+
+app.get('/api/run/status', (_req, res) => res.json(run));
+
+let task = null;
+let scheduled = null;
+
+/** (Re)arm the routine search from settings.json, falling back to INGEST_CRON. */
+async function reschedule() {
+  const settings = await loadSettings();
+  task?.stop();
+  task = null;
+  const expr = settings.schedule_cron || env.cron;
+  const off = settings.schedule_enabled === 'false' || settings.schedule_enabled === false;
+  scheduled = off || !cron.validate(expr) ? null : expr;
+  if (scheduled) task = cron.schedule(scheduled, () => cycle('schedule'));
+  console.log(scheduled ? `routine search: ${scheduled}` : 'routine search: off');
+  return scheduled;
+}
+
+// Don't die at boot if Postgres isn't up yet - serve the UI and let the routes
+// report the failure. A dead DB is usually transient (a container still
+// starting); an exited web server needs a human.
+await migrate().catch((err) => console.error(`migrate failed, continuing: ${reason(err)}`));
+await reschedule();
+
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`review queue on http://localhost:${port}`));
-process.on('SIGTERM', () => pool.end());
+process.on('SIGTERM', () => { task?.stop(); pool.end(); });

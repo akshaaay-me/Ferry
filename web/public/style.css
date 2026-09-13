@@ -1,14 +1,148 @@
-:root { --bg:#0f1115; --card:#181b22; --line:#272b35; --fg:#e6e8ec; --dim:#8b93a3; --acc:#6ee7a8; --warn:#e8b473; --err:#e87473; }
+/* Ferry — one stylesheet for all four pages. No framework, no build step.
+   Page-local <style> blocks hold only what is genuinely specific to that page. */
+
+:root {
+  /* colour — dark is the default; the light block below only swaps these */
+  --bg:#0f1115; --card:#181b22; --card-2:#11141a; --line:#272b35;
+  --fg:#e6e8ec; --dim:#8b93a3; --acc:#6ee7a8; --acc-ink:#0f1115;
+  --warn:#e8b473; --err:#e87473;
+
+  /* spacing scale */
+  --s1:.25rem; --s2:.5rem; --s3:.75rem; --s4:1rem; --s5:1.5rem; --s6:2rem; --s7:3rem;
+
+  /* type + shape */
+  --t-sm:.82rem; --t-xs:.74rem; --r:10px; --r-sm:6px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:#f7f8fa; --card:#fff; --card-2:#f1f3f6; --line:#dde1e8;
+    --fg:#171a21; --dim:#5f6878; --acc:#12805a; --acc-ink:#fff;
+    --warn:#9a5b12; --err:#b3342f;
+  }
+}
+
 * { box-sizing: border-box }
-body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif }
-header { padding:1.2rem 1.5rem; border-bottom:1px solid var(--line); display:flex; gap:1rem; align-items:center; flex-wrap:wrap }
-h1 { font-size:1rem; margin:0; letter-spacing:.02em; font-weight:600 }
-select, button, input { background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:.35rem .6rem; font:inherit; cursor:pointer }
-input { cursor:text }
-button:hover { border-color:var(--acc) }
+
+body {
+  margin:0; background:var(--bg); color:var(--fg);
+  font:14px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- header + nav ------------------------------------------------------ */
+
+header {
+  position:sticky; top:0; z-index:10;
+  padding:var(--s3) var(--s5);
+  background:color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom:1px solid var(--line);
+  display:flex; gap:var(--s3); align-items:center; flex-wrap:wrap;
+}
+h1 { font-size:1rem; margin:0; letter-spacing:.02em; font-weight:600; margin-right:var(--s2) }
+
+.topnav { display:flex; gap:var(--s4); margin-left:auto; align-items:center }
+.topnav a {
+  color:var(--dim); text-decoration:none; font-size:.88rem;
+  padding:var(--s1) 0; border-bottom:1.5px solid transparent;
+}
+.topnav a:hover { color:var(--fg) }
+.topnav a[aria-current="page"] { color:var(--fg); border-bottom-color:var(--acc) }
+
+/* --- controls ---------------------------------------------------------- */
+
+select, button, input, textarea {
+  background:var(--card); color:var(--fg);
+  border:1px solid var(--line); border-radius:var(--r-sm);
+  padding:.4rem .6rem; font:inherit;
+}
+button, select { cursor:pointer }
+input, textarea { cursor:text }
+textarea { resize:vertical; min-height:3.2em; line-height:1.5 }
+
+button:hover:not(:disabled), select:hover { border-color:var(--acc) }
 button:disabled { opacity:.5; cursor:default }
+:is(input, textarea, select, button):focus-visible {
+  outline:2px solid var(--acc); outline-offset:1px; border-color:transparent;
+}
+input[type="checkbox"] { width:auto; cursor:pointer; accent-color:var(--acc) }
+
+/* the one call-to-action per page */
+.primary {
+  background:var(--acc); color:var(--acc-ink);
+  border-color:transparent; font-weight:600; padding:.45rem 1.1rem;
+}
+.primary:hover:not(:disabled) { filter:brightness(1.08) }
+
 a { color:var(--acc) }
-.note { margin-top:.7rem; padding:.7rem; background:#11141a; border-left:2px solid var(--acc); white-space:pre-wrap; font-size:.88rem; border-radius:0 6px 6px 0 }
-.topnav { display:flex; gap:1rem; margin-left:auto; align-items:center }
-.topnav a { color:var(--dim); text-decoration:none; font-size:.88rem }
-.topnav a:hover { color:var(--acc) }
+
+/* --- layout blocks ----------------------------------------------------- */
+
+main { margin:var(--s5) auto; padding:0 var(--s5) var(--s7); display:grid; gap:var(--s4) }
+
+fieldset {
+  border:1px solid var(--line); border-radius:var(--r);
+  background:var(--card);
+  padding:var(--s4) var(--s4) var(--s4);
+  display:grid; gap:var(--s3); margin:0;
+}
+legend {
+  padding:0 var(--s2); color:var(--dim);
+  font-size:var(--t-xs); text-transform:uppercase; letter-spacing:.06em; font-weight:600;
+}
+label { display:grid; gap:var(--s1); font-size:var(--t-sm); color:var(--dim) }
+label > :is(input, textarea, select) { width:100%; color:var(--fg) }
+label.inline { display:flex; align-items:center; gap:var(--s2) }
+
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--s3) }
+.row { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap }
+
+/* a nested repeatable record: one role, project, skill group, story */
+.item {
+  border:1px solid var(--line); border-radius:var(--r-sm);
+  background:var(--card-2);
+  padding:var(--s3); display:grid; gap:var(--s2); position:relative;
+}
+.item .remove {
+  position:absolute; top:var(--s2); right:var(--s2);
+  font-size:var(--t-xs); padding:.1rem .45rem; color:var(--dim);
+}
+.item .remove:hover { color:var(--err); border-color:var(--err) }
+
+.hint { color:var(--dim); font-size:var(--t-xs); margin:0 }
+.id { color:var(--dim); font-size:var(--t-xs); font-family:var(--mono) }
+
+/* output panel: tailored resume note, prep notes, timeline, HR email draft */
+.note {
+  margin-top:var(--s3); padding:var(--s3);
+  background:var(--card-2); border-left:2px solid var(--acc);
+  white-space:pre-wrap; font-size:.88rem; border-radius:0 var(--r-sm) var(--r-sm) 0;
+  overflow-x:auto;
+}
+.note b { display:inline-block; margin-bottom:var(--s1) }
+
+/* fixed action bar (profile page) */
+.bar {
+  position:fixed; bottom:0; left:0; right:0; z-index:10;
+  padding:var(--s3) var(--s5);
+  background:color-mix(in srgb, var(--card) 92%, transparent);
+  backdrop-filter: blur(8px);
+  border-top:1px solid var(--line);
+  display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap;
+}
+.status { color:var(--dim); font-size:var(--t-sm) }
+.status.err { color:var(--err) }
+
+.empty { color:var(--dim); text-align:center; padding:var(--s7) }
+
+/* --- responsive -------------------------------------------------------- */
+
+@media (max-width:40rem) {
+  header { padding:var(--s3) var(--s4) }
+  main { padding:0 var(--s4) var(--s7) }
+  .grid2 { grid-template-columns:1fr }
+  .topnav { margin-left:0; width:100%; gap:var(--s3); order:3 }
+  header > select, header > button { flex:1 1 8rem }
+}

@@ -3,13 +3,8 @@
 <title>job agent · settings</title>
 <link rel="stylesheet" href="/style.css">
 <style>
-  main { max-width:34rem; margin:1.5rem auto; padding:0 1.5rem; display:grid; gap:1.2rem }
-  fieldset { border:1px solid var(--line); border-radius:10px; padding:1rem 1.1rem; display:grid; gap:.6rem }
-  legend { padding:0 .4rem; color:var(--dim); font-size:.8rem; text-transform:uppercase; letter-spacing:.04em }
-  label { display:grid; gap:.25rem; font-size:.85rem; color:var(--dim) }
-  input { width:100% }
-  .row { display:flex; gap:.6rem; align-items:center }
-  .hint { color:var(--dim); font-size:.78rem; margin:0 }
+  main { max-width:36rem }
+  #daily-at[hidden], #custom-cron-row[hidden] { display:none }
 </style>
 
 <header>
@@ -17,24 +12,34 @@
   <nav class="topnav">
     <a href="/">review</a>
     <a href="/profile.html">profile</a>
-    <a href="/settings.html">settings</a>
+    <a href="/settings.html" aria-current="page">settings</a>
     <a href="#" id="logout">logout</a>
   </nav>
 </header>
 <main>
-  <p class="hint">Leave a field blank to fall back to its .env value. See .env.example for provider recipes (OpenRouter, Groq, Ollama, ...).</p>
+  <p class="hint">Leave a field blank to fall back to its .env value. Saving takes effect on the next call — no restart.</p>
 
   <fieldset>
-    <legend>provider</legend>
-    <label>provider <input id="provider" placeholder="anthropic (default) or openai"></label>
-    <label>base url <input id="base_url" placeholder="https://openrouter.ai/api/v1"></label>
-    <label>api key <input id="api_key" type="password" placeholder="sk-or-..."></label>
+    <legend>ai provider</legend>
+    <label>provider
+      <select id="preset">
+        <option value="anthropic">Anthropic (direct)</option>
+        <option value="openrouter">OpenRouter</option>
+        <option value="groq">Groq</option>
+        <option value="together">Together</option>
+        <option value="gemini">Google Gemini (OpenAI-compatible)</option>
+        <option value="ollama">Ollama (local)</option>
+        <option value="custom">Custom OpenAI-compatible…</option>
+      </select></label>
+    <p class="hint" id="preset-hint"></p>
+    <label id="base-row">base url <input id="base_url" placeholder="https://openrouter.ai/api/v1"></label>
+    <label>api key <input id="api_key" type="password" placeholder="sk-or-…"></label>
     <label>model <input id="model" placeholder="deepseek/deepseek-chat-v3.1:free"></label>
   </fieldset>
 
-  <fieldset>
-    <legend>anthropic (used when provider is anthropic)</legend>
-    <label>anthropic api key <input id="anthropic_api_key" type="password" placeholder="sk-ant-..."></label>
+  <fieldset id="anthropic-box">
+    <legend>anthropic credentials</legend>
+    <label>anthropic api key <input id="anthropic_api_key" type="password" placeholder="sk-ant-…"></label>
     <label>anthropic model <input id="anthropic_model" placeholder="claude-sonnet-4-6"></label>
   </fieldset>
 
@@ -42,36 +47,156 @@
     <legend>per-stage overrides</legend>
     <label>score model <input id="score_model" placeholder="cheap model, runs ~40x per cycle"></label>
     <label>tailor model <input id="tailor_model" placeholder="quality model, runs on demand"></label>
+    <label>voyage api key (embeddings, optional) <input id="voyage_api_key" type="password"></label>
   </fieldset>
 
   <fieldset>
-    <legend>embeddings (optional)</legend>
-    <label>voyage api key <input id="voyage_api_key" type="password"></label>
+    <legend>routine search</legend>
+    <p class="hint">How often the agent searches on its own. The <b>search</b> button on the review page runs one immediately, any time.</p>
+    <label>frequency
+      <select id="freq">
+        <option value="off">off — manual only</option>
+        <option value="3h">every 3 hours</option>
+        <option value="6h">every 6 hours</option>
+        <option value="12h">every 12 hours</option>
+        <option value="daily">once a day, at…</option>
+        <option value="custom">custom cron…</option>
+      </select></label>
+    <label id="daily-at" hidden>time <input type="time" id="at" value="09:00"></label>
+    <label id="custom-cron-row" hidden>cron expression <input id="schedule_cron" placeholder="0 */3 * * *"></label>
+    <p class="hint" id="cron-preview"></p>
+  </fieldset>
+
+  <fieldset>
+    <legend>notifications — telegram</legend>
+    <p class="hint">Message <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> for a token, then <a href="https://t.me/userinfobot" target="_blank" rel="noopener">@userinfobot</a> for your chat id. Blank = new matches just print to the server log.</p>
+    <label>bot token <input id="telegram_bot_token" type="password" placeholder="123456:ABC-…"></label>
+    <label>chat id <input id="telegram_chat_id" placeholder="123456789"></label>
+    <label>email for digests <input id="notify_email" type="email" placeholder="not sent yet — reserved"></label>
   </fieldset>
 
   <div class="row">
-    <button id="save">save</button>
+    <button id="save" class="primary">save</button>
     <button id="test" type="button">test connection</button>
+    <button id="test-notify" type="button">test notification</button>
   </div>
   <div class="note" id="result" hidden></div>
 </main>
 
 <script>
-const FIELDS = ['provider','base_url','api_key','model','anthropic_api_key','anthropic_model','score_model','tailor_model','voyage_api_key'];
+const FIELDS = ['base_url','api_key','model','anthropic_api_key','anthropic_model',
+  'score_model','tailor_model','voyage_api_key','telegram_bot_token','telegram_chat_id',
+  'notify_email','schedule_cron'];
 const $ = (s) => document.querySelector(s);
+
+// `provider` only has two meaningful values downstream - src/llm.js branches on
+// 'anthropic' vs everything-else. These presets are just base_url + model recipes
+// on top of the openai-compatible path; see .env.example for the same list.
+const PRESETS = {
+  anthropic:  { provider:'anthropic', base:'',                                   model:'claude-sonnet-4-6',                  hint:'Anthropic’s own API. Uses the credentials below.' },
+  openrouter: { provider:'openai', base:'https://openrouter.ai/api/v1',           model:'deepseek/deepseek-chat-v3.1:free',   hint:'One key, most models. Has a usable free tier.' },
+  groq:       { provider:'openai', base:'https://api.groq.com/openai/v1',         model:'llama-3.3-70b-versatile',            hint:'Very fast, free tier is rate-limited — the client already backs off on 429.' },
+  together:   { provider:'openai', base:'https://api.together.xyz/v1',            model:'meta-llama/Llama-3.3-70B-Instruct-Turbo', hint:'Open-weight models, paid.' },
+  gemini:     { provider:'openai', base:'https://generativelanguage.googleapis.com/v1beta/openai', model:'gemini-2.0-flash', hint:'Gemini through its OpenAI-compatible endpoint.' },
+  ollama:     { provider:'openai', base:'http://localhost:11434/v1',              model:'qwen2.5:14b',                        hint:'Local, no key needed. Leave the api key blank.' },
+  custom:     { provider:'openai', base:'',                                       model:'',                                   hint:'Any OpenAI-compatible server (vLLM, llama.cpp, a proxy).' },
+};
+
+function applyPreset(name, { fill = true } = {}) {
+  const p = PRESETS[name];
+  $('#preset-hint').textContent = p.hint;
+  $('#base-row').hidden = name === 'anthropic';
+  $('#anthropic-box').hidden = name !== 'anthropic';
+  if (fill) {
+    if (name !== 'custom') $('#base_url').value = p.base;
+    $('#model').placeholder = p.model;
+  }
+}
+
+/** Which preset the saved base_url came from - so a reload shows what you picked. */
+function presetFor(settings) {
+  if ((settings.provider || 'anthropic') === 'anthropic') return 'anthropic';
+  const hit = Object.entries(PRESETS).find(([, p]) => p.base && p.base === settings.base_url);
+  return hit ? hit[0] : 'custom';
+}
+
+// --- routine search: frequency picker <-> cron string ---
+
+const FREQ_CRON = { '3h': '0 */3 * * *', '6h': '0 */6 * * *', '12h': '0 */12 * * *' };
+
+/** Build the cron expression the server will store. '' means the routine is off. */
+function cronFromUI() {
+  const freq = $('#freq').value;
+  if (freq === 'off') return '';
+  if (freq === 'custom') return $('#schedule_cron').value.trim();
+  if (freq === 'daily') {
+    const [h, m] = ($('#at').value || '09:00').split(':').map(Number);
+    return `${m} ${h} * * *`;
+  }
+  return FREQ_CRON[freq];
+}
+
+/** Inverse, for showing a stored cron in the picker. */
+function uiFromCron(expr) {
+  if (!expr) return { freq: 'off' };
+  const preset = Object.entries(FREQ_CRON).find(([, c]) => c === expr);
+  if (preset) return { freq: preset[0] };
+  const daily = expr.match(/^(\d{1,2}) (\d{1,2}) \* \* \*$/);
+  if (daily) {
+    const [, m, h] = daily;
+    return { freq: 'daily', at: `${h.padStart(2, '0')}:${m.padStart(2, '0')}` };
+  }
+  return { freq: 'custom' };
+}
+
+function syncFreq() {
+  const freq = $('#freq').value;
+  $('#daily-at').hidden = freq !== 'daily';
+  $('#custom-cron-row').hidden = freq !== 'custom';
+  const cron = cronFromUI();
+  $('#cron-preview').textContent = cron ? `cron: ${cron}` : 'the agent will only search when you press search.';
+}
 
 async function load() {
   const settings = await (await fetch('/api/settings')).json();
   for (const f of FIELDS) $('#' + f).value = settings[f] || '';
+  const name = presetFor(settings);
+  $('#preset').value = name;
+  applyPreset(name, { fill: false });
+  $('#model').placeholder = PRESETS[name].model;
+
+  const ui = uiFromCron(settings.schedule_enabled === 'false' ? '' : settings.schedule_cron);
+  $('#freq').value = ui.freq;
+  if (ui.at) $('#at').value = ui.at;
+  syncFreq();
 }
+
+function show(text, isError) {
+  const el = $('#result');
+  el.hidden = false;
+  el.textContent = text;
+  el.style.borderLeftColor = isError ? 'var(--err)' : 'var(--acc)';
+}
+
+$('#preset').onchange = () => { applyPreset($('#preset').value); syncFreq(); };
+$('#freq').onchange = syncFreq;
+$('#at').onchange = syncFreq;
+$('#schedule_cron').oninput = syncFreq;
 
 $('#save').onclick = async () => {
   const body = {};
   for (const f of FIELDS) body[f] = $('#' + f).value;
-  await fetch('/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  const el = $('#result');
-  el.hidden = false;
-  el.textContent = 'saved.';
+  body.provider = PRESETS[$('#preset').value].provider;
+  const cron = cronFromUI();
+  body.schedule_cron = cron;
+  body.schedule_enabled = cron ? 'true' : 'false';
+
+  const res = await fetch('/api/settings', {
+    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) return show(`✗ ${data.error}`, true);
+  show(data.schedule ? `saved. routine search: ${data.schedule}` : 'saved. routine search is off.');
 };
 
 $('#test').onclick = async () => {
@@ -79,9 +204,16 @@ $('#test').onclick = async () => {
   btn.disabled = true; btn.textContent = 'testing…';
   const res = await (await fetch('/api/settings/test', { method: 'POST' })).json();
   btn.disabled = false; btn.textContent = 'test connection';
-  const el = $('#result');
-  el.hidden = false;
-  el.textContent = res.ok ? `✓ connected — model replied: ${res.reply}` : `✗ ${res.error}`;
+  show(res.ok ? `✓ connected — model replied: ${res.reply}` : `✗ ${res.error}`, !res.ok);
+};
+
+$('#test-notify').onclick = async () => {
+  const btn = $('#test-notify');
+  btn.disabled = true; btn.textContent = 'sending…';
+  const res = await (await fetch('/api/notify/test', { method: 'POST' })).json();
+  btn.disabled = false; btn.textContent = 'test notification';
+  if (!res.ok) return show(`✗ ${res.error}`, true);
+  show(res.sent ? '✓ sent — check Telegram.' : `no telegram credentials saved; ${res.note}`, !res.sent);
 };
 
 $('#logout').onclick = async (e) => {

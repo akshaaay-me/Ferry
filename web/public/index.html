@@ -3,28 +3,33 @@
 <title>job agent · review queue</title>
 <link rel="stylesheet" href="/style.css">
 <style>
-  main { max-width:60rem; margin:1.5rem auto; padding:0 1.5rem; display:grid; gap:.9rem }
-  .job { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:1rem 1.1rem }
+  main { max-width:62rem }
+  .job { background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:var(--s4) }
   .job.viewed .title, .job.viewed .score { opacity:.55 }
-  .seen { color:var(--dim); font-size:.72rem; border:1px solid var(--line); border-radius:4px; padding:0 .35rem; margin-left:.3rem }
+  .seen { color:var(--dim); font-size:var(--t-xs); border:1px solid var(--line); border-radius:4px; padding:0 .35rem; margin-left:.3rem }
   .top { display:flex; gap:.8rem; align-items:baseline; flex-wrap:wrap }
   .score { font-variant-numeric:tabular-nums; font-weight:700; color:var(--acc); min-width:3ch }
   .title { font-weight:600 }
   .co { color:var(--dim) }
-  .meta { color:var(--dim); font-size:.82rem; margin-top:.15rem }
-  .dims { color:var(--dim); font-size:.78rem; margin-top:.35rem; display:flex; gap:.9rem; flex-wrap:wrap }
+  .meta { color:var(--dim); font-size:var(--t-sm); margin-top:.15rem }
+  .dims { color:var(--dim); font-size:var(--t-xs); margin-top:.35rem; display:flex; gap:.9rem; flex-wrap:wrap }
   .dims b { color:var(--fg); font-weight:600 }
-  .verdict { margin:.6rem 0 0; }
-  .gaps { color:var(--warn); font-size:.85rem; margin-top:.3rem }
+  .verdict { margin:.6rem 0 0 }
+  .gaps { color:var(--warn); font-size:var(--t-sm); margin-top:.3rem }
   .actions { display:flex; gap:.5rem; margin-top:.8rem; flex-wrap:wrap; align-items:center }
   .note.timeline { border-left-color:var(--dim) }
   .timeline-row { display:flex; gap:.6rem; color:var(--dim) }
   .timeline-row b { color:var(--fg) }
-  .empty { color:var(--dim); text-align:center; padding:3rem }
+  #run-status { color:var(--dim); font-size:var(--t-sm) }
+  #run-status.err { color:var(--err) }
+  .mail label { margin-bottom:.4rem }
+  .mail textarea { min-height:12em; font-family:var(--mono); font-size:.8rem }
 </style>
 
 <header>
   <h1>review queue</h1>
+  <button id="run" class="primary">search</button>
+  <span id="run-status"></span>
   <select id="status">
     <option value="inbox">inbox</option>
     <option value="shortlist">shortlist</option>
@@ -55,7 +60,7 @@
   </select>
   <span id="count" class="co"></span>
   <nav class="topnav">
-    <a href="/">review</a>
+    <a href="/" aria-current="page">review</a>
     <a href="/profile.html">profile</a>
     <a href="/settings.html">settings</a>
     <a href="#" id="logout">logout</a>
@@ -132,12 +137,14 @@ function render() {
         <a href="${esc(j.url)}" target="_blank" rel="noopener noreferrer" data-act="open"><button>open posting →</button></a>
         <select data-act="stage">${stageOptions}</select>
         <button data-act="tailor">tailor resume</button>
+        <button data-act="email">draft HR email</button>
         <button data-act="prep">prep interview</button>
         <button data-act="timeline">timeline</button>
         ${j.resume ? `<a href="${esc(j.resume.replace(/^.*\/out/, '/out'))}" target="_blank"><button>last resume</button></a>` : ''}
         ${j.prep_id ? `<button data-act="last-prep">last prep</button>` : ''}
       </div>
       <div class="note tailor-note" hidden></div>
+      <div class="note mail" hidden></div>
       <div class="note prep-note" hidden></div>
       <div class="note timeline" hidden></div>`;
 
@@ -166,6 +173,34 @@ function render() {
         ? `error: ${esc(res.error)}`
         : `<b>cover note</b>\n${esc(res.cover_note)}\n\n<a href="${esc(res.pdf || res.html)}" target="_blank">open resume</a>`
           + (res.dropped?.length ? `\n\n⚠ dropped ${res.dropped.length} unsourced bullet(s)` : '');
+    };
+
+    // Draft only. The server has no mail transport - this fills in a recipient
+    // guess, a subject and a body for you to check and send yourself.
+    el.querySelector('[data-act="email"]').onclick = async (e) => {
+      const note = el.querySelector('.mail');
+      e.target.textContent = 'writing…'; e.target.disabled = true;
+      const res = await (await fetch(`/api/jobs/${j.id}/email`, { method:'POST' })).json();
+      e.target.textContent = 'draft HR email'; e.target.disabled = false;
+      note.hidden = false;
+      if (res.error) { note.innerHTML = `error: ${esc(res.error)}`; return; }
+      note.innerHTML = `
+        <label>to — <b>a guess from the posting URL, check it before sending</b>
+          <input class="to" value="${esc(res.to)}" placeholder="careers@company.com"></label>
+        <label>subject <input class="subject" value="${esc(res.subject)}"></label>
+        <label>body <textarea class="body">${esc(res.body)}</textarea></label>
+        <div class="row"><button class="copy">copy</button><button class="send">open in mail app</button></div>`;
+
+      const val = (sel) => note.querySelector(sel).value;
+      note.querySelector('.copy').onclick = async (ev) => {
+        await navigator.clipboard.writeText(`${val('.subject')}\n\n${val('.body')}`);
+        ev.target.textContent = 'copied';
+        setTimeout(() => { ev.target.textContent = 'copy'; }, 1500);
+      };
+      note.querySelector('.send').onclick = () => {
+        location.href = `mailto:${encodeURIComponent(val('.to'))}`
+          + `?subject=${encodeURIComponent(val('.subject'))}&body=${encodeURIComponent(val('.body'))}`;
+      };
     };
 
     function renderPrep(note, res) {
@@ -212,6 +247,49 @@ function render() {
   }
 }
 
+// --- search: run the pipeline now -------------------------------------------
+// POST starts it and returns immediately; the cycle takes minutes, so poll for
+// which of the four stages it's on rather than holding a request open.
+
+const STEP_LABEL = { ingest:'pulling sources', prefilter:'keyword filter', score:'scoring with the LLM', notify:'notifying' };
+
+function showRun(text, isError) {
+  $('#run-status').textContent = text;
+  $('#run-status').classList.toggle('err', !!isError);
+}
+
+function summarize(result) {
+  if (!result) return '';
+  const { ingest: i, prefilter: p, score: s, notify: n } = result;
+  return [
+    i && `${i.new} new`,
+    p && `${p.promoted} to score`,
+    s && `${s.scored} scored, ${s.above_threshold} above threshold`,
+    n && `${n.sent} notified`,
+  ].filter(Boolean).join(' · ');
+}
+
+async function pollRun() {
+  const run = await (await fetch('/api/run/status')).json();
+  if (run.running) {
+    showRun(`searching — ${STEP_LABEL[run.step] || run.step || 'starting'}…`);
+    setTimeout(pollRun, 2000);
+    return;
+  }
+  $('#run').disabled = false;
+  if (run.error) showRun(`search failed: ${run.error}`, true);
+  else showRun(run.finishedAt ? `done — ${summarize(run.result) || 'nothing new'}` : '');
+  load();
+}
+
+$('#run').onclick = async () => {
+  $('#run').disabled = true;
+  showRun('starting…');
+  const res = await fetch('/api/run', { method: 'POST' });
+  if (res.status === 409) showRun('already running…');
+  pollRun();
+};
+
 $('#status').onchange = load;
 $('#min').onchange = load;
 $('#age').onchange = load;
@@ -221,4 +299,8 @@ $('#logout').onclick = async (e) => {
   location.href = '/login.html';
 };
 load();
+// A scheduled cycle may already be mid-flight when you open the page.
+fetch('/api/run/status').then((r) => r.json()).then((run) => {
+  if (run.running) { $('#run').disabled = true; pollRun(); }
+});
 </script>

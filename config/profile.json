@@ -115,8 +115,7 @@
     "locations": [
       "bengaluru",
       "bangalore",
-      "india",
-      "remote"
+      "india"
     ],
     "remote_ok": true,
     "_seniority_comment": "Soft rank penalty for in-domain titles matching exclude_seniority[], NOT a kill - score.js grades the stretch with the full JD. Senior/staff JDs are keyword-dense and would otherwise sweep the whole 40-row LLM budget away from junior and mid roles. Raise toward 1.0 to see more senior stretches, lower to focus on your own level.",
@@ -207,12 +206,6 @@
       "EC2",
       "Cloudflare",
       "Azure"
-    ],
-    "Frontend": [
-      "React",
-      "React Native",
-      "Admin dashboards",
-      "Desktop apps"
     ],
     "AI / CV": [
       "OpenCV",
@@ -309,16 +302,6 @@
       ]
     },
     {
-      "id": "pr2",
-      "name": "Star Singer System",
-      "text": "Delivered a live event scoring and display system used in production, spanning device input, backend state, and an operator-facing UI.",
-      "tags": [
-        "fullstack",
-        "realtime",
-        "product"
-      ]
-    },
-    {
       "id": "pr3",
       "name": "STM32U585 Embedded AI Activity Recognition",
       "text": "Built an on-device activity recognition system on STM32U585: IMU data acquisition at 50 Hz over a standing/walking/squatting dataset, TensorFlow Lite model training with INT8 quantization, and deployment via STM32CubeAI / X-CUBE-AI for real-time on-device inference.",
@@ -371,17 +354,6 @@
         "microsd",
         "cellular",
         "telematics",
-        "data-logging"
-      ]
-    },
-    {
-      "id": "pr7",
-      "name": "STM32 SD Card Data Logger",
-      "text": "Built an SD card data logger on STM32U5 (SDMMC1, FatFs) for CSV logging of BLE heart-rate data, including HR and RR interval logging.",
-      "tags": [
-        "embedded",
-        "stm32",
-        "ble",
         "data-logging"
       ]
     },

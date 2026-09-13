@@ -88,10 +88,14 @@ list to a few hundred companies is where the value is.
 ## Run it
 
 ```bash
-npm run cli run     # ingest -> prefilter -> score -> notify, once
-npm start           # same, on a cron (INGEST_CRON, default every 3h)
-npm run web         # review queue at localhost:3000
+npm start           # the whole thing: review queue on :3000 + the routine search
+npm run cli run     # or one cycle by hand: ingest -> prefilter -> score -> notify
 ```
+
+`npm start` (== `npm run web`) is one process serving the UI and owning the schedule.
+Press **search** on the review page to run a cycle now; set how often it runs on its own
+in Settings → routine search (stored in `config/settings.json`, falls back to
+`INGEST_CRON`). Changing it takes effect immediately — no restart.
 
 ```bash
 npm run cli list 0.75          # current matches
@@ -113,14 +117,26 @@ at; every action on it writes back to the database:
     (dims the card and adds a "seen" tag next time you load the queue)
   - a stage dropdown to move the job through the pipeline (see "Pipeline tracker" below)
   - **tailor resume** / **prep interview** - run those steps live and show the result inline
+  - **draft HR email** - for the many Indian embedded companies with no apply form.
+    Writes a grounded outreach mail (same bullet-inventory guardrail as the resume),
+    guesses a recipient from the posting's domain, and hands you **copy** and
+    **open in mail app**. Nothing is ever sent by the app - see "Why applying is manual"
   - **last resume** / **last prep** - once generated, re-open without regenerating
   - **timeline** - the `job_events` history for that job
+  - **search** (in the header) - runs a full cycle now and reports each stage as it goes
 - **profile** (`/profile.html`) - edit `config/profile.json` (basics, skills, experience
   bullets, projects, education, interview stories) from a form instead of hand-editing
-  JSON, plus a **generate resume** button for a baseline (non-job-tailored) resume
-- **settings** (`/settings.html`) - configure the AI provider (Anthropic, OpenRouter, Groq,
-  Ollama, ...) and per-stage model overrides from the UI instead of `.env` - saved to
-  `config/settings.json` (gitignored) and picked up on the next LLM call, no restart
+  JSON, plus a **generate resume** button for a baseline (non-job-tailored) resume.
+  The **job preferences** box at the top edits `match` - target roles, locations,
+  remote-ok, the two ranking penalties - which is what actually decides what gets found.
+  `match.keywords` and `match.exclude_titles` stay out of the UI (long, weighted,
+  documented inline) and are merged through untouched on save
+- **settings** (`/settings.html`) - pick the AI provider from a dropdown of presets
+  (Anthropic, OpenRouter, Groq, Together, Gemini, Ollama, or a custom OpenAI-compatible
+  URL) with per-stage model overrides; set the routine search schedule; set the Telegram
+  bot token and chat id, with a **test notification** button. Saved to
+  `config/settings.json` (gitignored) and picked up on the next call, no restart. Every
+  field falls back to its `.env` equivalent when blank
 
 If `WEB_AUTH_EMAIL` / `WEB_AUTH_PASSWORD` are set in `.env`, all of this sits behind a
 login page (`/login.html`, session cookie - see `web/server.js`) - leave them blank for
@@ -175,6 +191,48 @@ your judgment is actually worth something.
 One file in `src/adapters/`, exporting `name`, `fetchJobs({slug, name})` returning
 normalized jobs, and optionally `detect(html)` for the discovery crawler. Register it
 in `src/adapters/index.js`. Nothing downstream changes.
+
+## LinkedIn, Naukri, and the sources we don't read
+
+The obvious question is why the two biggest job sites in this market aren't here.
+Recorded so the answer doesn't have to be re-derived, in the spirit of the
+`_feeds_comment` in `config/targets.json`.
+
+**LinkedIn — don't.** There is no public jobs API; Talent Solutions is partner-gated and
+employer-side. Scraping breaks the User Agreement, and LinkedIn enforces it actively —
+auth walls, member-only job pages, a litigation history. The paid proxies (Proxycurl,
+Bright Data, SerpApi) run ~$30–100/mo and move the legal exposure onto you rather than
+off it. The cheaper argument: **almost every LinkedIn embedded posting in India is also
+on the company's own ATS**, which Ferry already reads first-party, fresher, and with the
+full JD instead of a teaser.
+
+**Naukri — no clean route.** No public API, JS-rendered, anti-bot, the old RSS feeds are
+gone, and Resdex is recruiter-side. Indeed is equally closed: its publisher API stopped
+taking new applicants in 2023. **Adzuna — already in `targets.json`'s `feeds[]` — is the
+legitimate proxy for this market**, and the only source here that sees it at all.
+
+Ranked by value per hour of work, if you want more coverage:
+
+1. **Set the Adzuna key.** `ADZUNA_APP_ID` / `ADZUNA_APP_KEY`, free from
+   developer.adzuna.com. The adapter is already wired and errors every cycle until those
+   exist. Zero code, biggest immediate win.
+2. **Indian ATS adapters — highest ROI.** `targets.json` already names the gap: Indian
+   embedded startups sit on **Keka, Darwinbox, Zoho Recruit**, none of which have an
+   adapter. Each exposes predictable per-tenant JSON; each is a ~25-line file shaped like
+   `src/adapters/greenhouse.js`, plus a `detect()` so `cli discover:bulk` resolves them.
+3. **Email-alert ingestion — the realistic way to get LinkedIn *and* Naukri.** Point both
+   sites' job-alert emails at a dedicated mailbox and read it over IMAP. You're the
+   intended recipient, so there's no ToS problem, and one adapter (~80 lines +
+   `imapflow`) covers both. Real trade-off: alert mails carry a title, a company and a
+   link, no full JD — those rows reach the LLM scorer thin.
+4. **A generic config-driven `custom` adapter.** `{url, type: json|html, selector,
+   fieldMap}` in `targets.json` → any careers page with no new file per site (`cheerio`
+   is already a dependency). Cheap, and fragile: it breaks on every site redesign,
+   silently, surfacing only as a `-> 0` in the ingest log.
+5. **SerpApi Google Jobs** (~$50/mo). Aggregates LinkedIn/Naukri/Indeed postings through
+   search results, legitimately. The highest-coverage paid option.
+6. **Playwright against a logged-in LinkedIn/Naukri.** Works, violates the ToS, risks
+   your actual account, and breaks constantly. Don't.
 
 ## Notes
 

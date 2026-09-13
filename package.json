@@ -4,7 +4,7 @@
   "type": "module",
   "description": "ATS-first job discovery + resume tailoring pipeline. Applying stays manual.",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node web/server.js",
     "web": "node web/server.js",
     "cli": "node src/cli.js",
     "migrate": "node src/db.js --migrate"

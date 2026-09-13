@@ -3,35 +3,26 @@
 <title>job agent · profile</title>
 <link rel="stylesheet" href="/style.css">
 <style>
-  main { max-width:44rem; margin:1.5rem auto; padding:0 6rem 4rem 1.5rem; display:grid; gap:1.2rem }
-  fieldset { border:1px solid var(--line); border-radius:10px; padding:1rem 1.1rem; display:grid; gap:.7rem }
-  legend { padding:0 .4rem; color:var(--dim); font-size:.8rem; text-transform:uppercase; letter-spacing:.04em }
-  label { display:grid; gap:.25rem; font-size:.85rem; color:var(--dim) }
-  input, textarea { width:100%; font:inherit }
-  textarea { resize:vertical; min-height:3.2em }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:.6rem }
-  .item { border:1px solid var(--line); border-radius:8px; padding:.8rem; display:grid; gap:.5rem; position:relative }
-  .item .remove { position:absolute; top:.5rem; right:.5rem; font-size:.72rem; padding:.15rem .45rem }
+  main { max-width:46rem; padding-bottom:6rem }
   .bullet { border-left:2px solid var(--line); padding-left:.6rem; display:grid; gap:.35rem }
-  .id { color:var(--dim); font-size:.75rem; font-family:ui-monospace,monospace }
-  .bar { position:fixed; bottom:0; left:0; right:0; padding:.8rem 1.5rem; background:var(--card); border-top:1px solid var(--line); display:flex; gap:.6rem; align-items:center }
-  .bar button { padding:.5rem 1.1rem }
-  #save { background:var(--acc); color:#0f1115; font-weight:600; border:none }
-  .status { color:var(--dim); font-size:.85rem }
+  /* .remove is absolutely-positioned by default (top-right of an .item); a
+     bullet's own remove sits inline under it instead. */
+  .bullet .remove { position:static }
+  .add, .bullet .remove { justify-self:start }
 </style>
 
 <header>
   <h1>profile</h1>
   <nav class="topnav">
     <a href="/">review</a>
-    <a href="/profile.html">profile</a>
+    <a href="/profile.html" aria-current="page">profile</a>
     <a href="/settings.html">settings</a>
     <a href="#" id="logout">logout</a>
   </nav>
 </header>
 <main id="main"></main>
 <div class="bar">
-  <button id="save">save profile</button>
+  <button id="save" class="primary">save profile</button>
   <button id="resume">generate resume</button>
   <span class="status" id="status"></span>
 </div>
@@ -43,15 +34,82 @@ const esc = (v) => String(v ?? '').replace(/[<>&"']/g,
 
 let profile = null;
 let skillGroups = []; // [{group, skills:[...]}] - editing view of profile.skills, converted back on save
+let dirty = false;
+let loaded = false;
 
-function nextId(ids, prefix) {
-  const nums = ids.filter((id) => id && id.startsWith(prefix))
-    .map((id) => parseInt(id.slice(prefix.length), 10)).filter(Number.isFinite);
-  return `${prefix}${(nums.length ? Math.max(...nums) : 0) + 1}`;
+/** Every id in the profile, whatever section it lives in. */
+function allIds() {
+  return [
+    ...profile.experience.flatMap((e) => (e.bullets || []).map((b) => b.id)),
+    ...profile.projects.map((p) => p.id),
+    ...profile.education.map((e) => e.id),
+    ...profile.stories.map((s) => s.id),
+  ].filter(Boolean);
+}
+
+/**
+ * Mint an id that collides with nothing anywhere in the profile.
+ *
+ * The old version numbered within one section using an array-INDEX prefix
+ * (`b${roleIndex}-`), so removing a role renumbered the survivors and the next
+ * "add bullet" could hand out an id another role already held. The save then
+ * 400'd on the server's duplicate check and the whole editing session was lost.
+ * Scanning every id and taking the global max removes that class of bug for all
+ * four callers at once.
+ */
+function uid(prefix) {
+  const ids = new Set(allIds());
+  let n = ids.size + 1;
+  while (ids.has(`${prefix}${n}`)) n++;
+  return `${prefix}${n}`;
 }
 
 function tagsToStr(t) { return (t || []).join(', '); }
 function strToTags(s) { return s.split(',').map((t) => t.trim()).filter(Boolean); }
+
+function markDirty() {
+  dirty = true;
+  $('#status').textContent = '';
+  $('#status').classList.remove('err');
+}
+
+// --- Preferences (profile.match) ---
+// The knobs that decide what the search actually finds. keywords[] and
+// exclude_titles[] stay out of the UI - long, weighted, and documented inline
+// in config/profile.json. saveProfile() merges this patch, so they survive.
+function renderPrefs() {
+  const m = profile.match || (profile.match = {});
+  return `
+  <fieldset>
+    <legend>job preferences</legend>
+    <p class="hint">Comma-separated. These drive the keyword prefilter — the LLM only ever reads what clears it.</p>
+    <label>target roles
+      <textarea data-pref="include_titles">${esc(tagsToStr(m.include_titles))}</textarea></label>
+    <label>preferred locations
+      <input data-pref="locations" value="${esc(tagsToStr(m.locations))}"></label>
+    <label>companies to never show
+      <input data-pref="exclude_companies" value="${esc(tagsToStr(m.exclude_companies))}"></label>
+    <label class="inline">
+      <input type="checkbox" data-pref="remote_ok" ${m.remote_ok ? 'checked' : ''}> remote roles count as a location match</label>
+    <div class="grid2">
+      <label>off-location penalty (0–1, higher = more international roles)
+        <input type="number" min="0" max="1" step="0.05" data-pref="off_location_penalty" value="${esc(m.off_location_penalty ?? 0.75)}"></label>
+      <label>seniority penalty (0–1, higher = more senior stretches)
+        <input type="number" min="0" max="1" step="0.05" data-pref="seniority_penalty" value="${esc(m.seniority_penalty ?? 0.6)}"></label>
+    </div>
+  </fieldset>`;
+}
+
+function wirePrefs(root) {
+  root.querySelectorAll('[data-pref]').forEach((el) => {
+    const key = el.dataset.pref;
+    el.oninput = el.onchange = () => {
+      if (el.type === 'checkbox') profile.match[key] = el.checked;
+      else if (el.type === 'number') profile.match[key] = Number(el.value);
+      else profile.match[key] = strToTags(el.value);
+    };
+  });
+}
 
 // --- Basics ---
 function renderBasics() {
@@ -93,7 +151,7 @@ function renderSkills() {
       <label>group <input data-skill-group="${i}" value="${esc(g.group)}"></label>
       <label>skills (comma-separated) <input data-skill-list="${i}" value="${esc(tagsToStr(g.skills))}"></label>
     </div>`).join('');
-  return `<fieldset><legend>skills</legend>${rows}<button type="button" id="add-skill">add group</button></fieldset>`;
+  return `<fieldset><legend>skills</legend>${rows}<button type="button" class="add" id="add-skill">add group</button></fieldset>`;
 }
 
 function wireSkills(root) {
@@ -106,7 +164,10 @@ function wireSkills(root) {
   root.querySelectorAll('[data-remove-skill]').forEach((el) => {
     el.onclick = () => { skillGroups.splice(+el.dataset.removeSkill, 1); renderAll(); };
   });
-  $('#add-skill', root).onclick = () => { skillGroups.push({ group: '', skills: [] }); renderAll(); };
+  $('#add-skill', root).onclick = () => {
+    skillGroups.push({ group: '', skills: [] });
+    renderAll(`[data-skill-group="${skillGroups.length - 1}"]`);
+  };
 }
 
 // --- Experience ---
@@ -117,7 +178,7 @@ function renderExperience() {
         <div class="id">${esc(b.id)}</div>
         <textarea data-exp="${ei}" data-bullet="${bi}" data-field="text">${esc(b.text)}</textarea>
         <input data-exp="${ei}" data-bullet="${bi}" data-field="tags" value="${esc(tagsToStr(b.tags))}" placeholder="tags, comma-separated">
-        <button type="button" class="remove" data-remove-bullet="${ei}:${bi}" style="justify-self:start">remove bullet</button>
+        <button type="button" class="remove" data-remove-bullet="${ei}:${bi}">remove bullet</button>
       </div>`).join('');
     return `
     <div class="item">
@@ -130,10 +191,10 @@ function renderExperience() {
         <label>location <input data-exp="${ei}" data-field="location" value="${esc(e.location)}"></label>
       </div>
       ${bullets}
-      <button type="button" data-add-bullet="${ei}" style="justify-self:start">add bullet</button>
+      <button type="button" class="add" data-add-bullet="${ei}">add bullet</button>
     </div>`;
   }).join('');
-  return `<fieldset><legend>experience</legend>${items}<button type="button" id="add-exp">add role</button></fieldset>`;
+  return `<fieldset><legend>experience</legend>${items}<button type="button" class="add" id="add-exp">add role</button></fieldset>`;
 }
 
 function wireExperience(root) {
@@ -159,15 +220,14 @@ function wireExperience(root) {
   root.querySelectorAll('[data-add-bullet]').forEach((el) => {
     el.onclick = () => {
       const ei = +el.dataset.addBullet;
-      const ids = profile.experience[ei].bullets.map((b) => b.id);
-      const prefix = `b${ei}-`;
-      profile.experience[ei].bullets.push({ id: nextId(ids, prefix), text: '', tags: [] });
-      renderAll();
+      const bullets = profile.experience[ei].bullets;
+      bullets.push({ id: uid('b'), text: '', tags: [] });
+      renderAll(`[data-exp="${ei}"][data-bullet="${bullets.length - 1}"][data-field="text"]`);
     };
   });
   $('#add-exp', root).onclick = () => {
     profile.experience.push({ company: '', role: '', start: '', end: 'Present', location: '', bullets: [] });
-    renderAll();
+    renderAll(`[data-exp="${profile.experience.length - 1}"][data-field="company"]`);
   };
 }
 
@@ -181,7 +241,7 @@ function renderProjects() {
       <label>description <textarea data-proj="${i}" data-field="text">${esc(p.text)}</textarea></label>
       <label>tags <input data-proj="${i}" data-field="tags" value="${esc(tagsToStr(p.tags))}"></label>
     </div>`).join('');
-  return `<fieldset><legend>projects</legend>${items}<button type="button" id="add-proj">add project</button></fieldset>`;
+  return `<fieldset><legend>projects</legend>${items}<button type="button" class="add" id="add-proj">add project</button></fieldset>`;
 }
 
 function wireProjects(root) {
@@ -195,9 +255,8 @@ function wireProjects(root) {
     el.onclick = () => { profile.projects.splice(+el.dataset.removeProj, 1); renderAll(); };
   });
   $('#add-proj', root).onclick = () => {
-    const ids = profile.projects.map((p) => p.id);
-    profile.projects.push({ id: nextId(ids, 'pr'), name: '', text: '', tags: [] });
-    renderAll();
+    profile.projects.push({ id: uid('pr'), name: '', text: '', tags: [] });
+    renderAll(`[data-proj="${profile.projects.length - 1}"][data-field="name"]`);
   };
 }
 
@@ -213,7 +272,7 @@ function renderEducation() {
         <label>year <input data-edu="${i}" data-field="year" value="${esc(ed.year)}"></label>
       </div>
     </div>`).join('');
-  return `<fieldset><legend>education</legend>${items}<button type="button" id="add-edu">add education</button></fieldset>`;
+  return `<fieldset><legend>education</legend>${items}<button type="button" class="add" id="add-edu">add education</button></fieldset>`;
 }
 
 function wireEducation(root) {
@@ -224,9 +283,8 @@ function wireEducation(root) {
     el.onclick = () => { profile.education.splice(+el.dataset.removeEdu, 1); renderAll(); };
   });
   $('#add-edu', root).onclick = () => {
-    const ids = profile.education.map((e) => e.id);
-    profile.education.push({ id: nextId(ids, 'ed'), school: '', degree: '', year: '' });
-    renderAll();
+    profile.education.push({ id: uid('ed'), school: '', degree: '', year: '' });
+    renderAll(`[data-edu="${profile.education.length - 1}"][data-field="school"]`);
   };
 }
 
@@ -243,7 +301,7 @@ function renderStories() {
       <label>result <textarea data-story="${i}" data-field="result">${esc(s.result)}</textarea></label>
       <label>tags <input data-story="${i}" data-field="tags" value="${esc(tagsToStr(s.tags))}"></label>
     </div>`).join('');
-  return `<fieldset><legend>interview stories (STAR)</legend>${items}<button type="button" id="add-story">add story</button></fieldset>`;
+  return `<fieldset><legend>interview stories (STAR)</legend>${items}<button type="button" class="add" id="add-story">add story</button></fieldset>`;
 }
 
 function wireStories(root) {
@@ -257,31 +315,68 @@ function wireStories(root) {
     el.onclick = () => { profile.stories.splice(+el.dataset.removeStory, 1); renderAll(); };
   });
   $('#add-story', root).onclick = () => {
-    const ids = profile.stories.map((s) => s.id);
-    profile.stories.push({ id: nextId(ids, 'st'), prompt: '', situation: '', task: '', action: '', result: '', tags: [] });
-    renderAll();
+    profile.stories.push({ id: uid('st'), prompt: '', situation: '', task: '', action: '', result: '', tags: [] });
+    renderAll(`[data-story="${profile.stories.length - 1}"][data-field="prompt"]`);
   };
 }
 
-function renderAll() {
+/**
+ * Full re-render on every structural change. Cheap enough at this size, but it
+ * used to dump you at the top of the page with nothing focused every time you
+ * clicked "add bullet" - so keep the scroll position, and put the cursor in the
+ * first field of whatever was just added.
+ */
+function renderAll(focusSel) {
   const main = $('#main');
-  main.innerHTML = renderBasics() + renderSkills() + renderExperience() + renderProjects() + renderEducation() + renderStories();
-  wireBasics(main); wireSkills(main); wireExperience(main); wireProjects(main); wireEducation(main); wireStories(main);
+  const y = window.scrollY;
+  // Every call after the initial one is a structural edit (add/remove); the
+  // delegated input listener only catches typing, not those.
+  if (loaded) markDirty();
+  main.innerHTML = renderPrefs() + renderBasics() + renderSkills() + renderExperience()
+    + renderProjects() + renderEducation() + renderStories();
+  wirePrefs(main); wireBasics(main); wireSkills(main); wireExperience(main);
+  wireProjects(main); wireEducation(main); wireStories(main);
+  window.scrollTo(0, y);
+  if (focusSel) {
+    const el = $(focusSel, main);
+    if (el) { el.focus(); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  }
 }
 
 async function load() {
   profile = await (await fetch('/api/profile')).json();
   skillGroups = Object.entries(profile.skills || {}).map(([group, skills]) => ({ group, skills }));
   renderAll();
+  loaded = true;
+  // One delegated listener beats threading markDirty() through ~20 handlers;
+  // it survives every re-render because #main itself is never replaced.
+  $('#main').addEventListener('input', markDirty);
+  $('#main').addEventListener('change', markDirty);
 }
 
+// Losing an editing session to an accidental back/refresh is the other way this
+// page ate work. Browsers show their own generic wording; returnValue just arms it.
+addEventListener('beforeunload', (e) => {
+  if (dirty) { e.preventDefault(); e.returnValue = ''; }
+});
+
 $('#save').onclick = async () => {
+  const btn = $('#save');
   profile.skills = Object.fromEntries(skillGroups.filter((g) => g.group).map((g) => [g.group, g.skills]));
-  const res = await fetch('/api/profile', {
-    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(profile),
-  });
-  const data = await res.json();
-  $('#status').textContent = res.ok ? 'saved.' : `error: ${data.error}`;
+  btn.disabled = true; btn.textContent = 'saving…';
+  try {
+    const res = await fetch('/api/profile', {
+      method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(profile),
+    });
+    const data = await res.json();
+    $('#status').textContent = res.ok ? 'saved.' : `error: ${data.error}`;
+    $('#status').classList.toggle('err', !res.ok);
+    if (res.ok) dirty = false;
+  } catch (err) {
+    $('#status').textContent = `error: ${err.message}`;
+    $('#status').classList.add('err');
+  }
+  btn.disabled = false; btn.textContent = 'save profile';
 };
 
 $('#resume').onclick = async () => {

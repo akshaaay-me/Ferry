@@ -10,9 +10,11 @@ const readJSON = async (p) => JSON.parse(await fs.readFile(path.join(root, p), '
 export const loadProfile = () => readJSON('config/profile.json');
 
 /**
- * Writes only the resume-content sections of profile.json. Spreads the
- * current file first so `match` (job-scoring config) and any `_comment`
- * keys survive untouched even if the caller's `next` includes them.
+ * Writes the resume-content sections of profile.json, plus an optional partial
+ * `match` patch. Spreads the current file first so any `_comment` keys survive.
+ * `match` is merged key-by-key, never replaced: the web UI only edits a handful
+ * of its fields (target roles, locations, penalties) and must not drop
+ * `keywords` / `exclude_titles` / the `_*_comment` docs it never shows.
  */
 export async function saveProfile(next) {
   const current = await loadProfile();
@@ -24,6 +26,7 @@ export async function saveProfile(next) {
     projects: next.projects,
     education: next.education,
     stories: next.stories,
+    match: next.match ? { ...current.match, ...next.match } : current.match,
   };
   await fs.writeFile(path.join(root, 'config/profile.json'), JSON.stringify(merged, null, 2) + '\n');
   return merged;
