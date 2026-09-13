@@ -1,0 +1,50 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jobagent
+      POSTGRES_PASSWORD: jobagent
+      POSTGRES_DB: jobagent
+    ports: ["127.0.0.1:5432:5432"]   # loopback only - not exposed to the internet
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobagent"]
+      interval: 5s
+      retries: 10
+
+  agent:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://jobagent:jobagent@db:5432/jobagent
+    volumes:
+      - ./config:/app/config
+      - ./out:/app/out
+    command: node src/index.js
+
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://jobagent:jobagent@db:5432/jobagent
+    # The bind address is per-host, so it lives in .env rather than here: this file is
+    # copied to the VM on every deploy, and a hardcoded value silently reverts the VM's
+    # setting (it did exactly that on 2026-09-12, taking the remote UI offline).
+    # Default is loopback - reach it via the SSH tunnel in DEPLOY.md §6.
+    # WEB_BIND=0.0.0.0 publishes it to the internet, guarded only by WEB_AUTH_* Basic Auth.
+    ports: ["${WEB_BIND:-127.0.0.1}:3000:3000"]
+    volumes:
+      - ./config:/app/config
+      - ./out:/app/out
+    command: node web/server.js
+
+volumes:
+  pgdata:

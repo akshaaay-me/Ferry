@@ -1,0 +1,24 @@
+{
+  "_comment": "companies[] is merged with the DB companies table (grown by `npm run cli discover`). Verify a slug against the ATS endpoint before trusting it - a dead slug returns [] and logs '-> 0', which looks exactly like 'no openings'. `ingest` now names zero-returning sources at the end of every cycle; check that line.",
+
+  "_feeds_comment": "The six remote aggregators (remotive, arbeitnow, himalayas, remoteok, weworkremotely, themuse) were measured on 2026-09-11: 477 rows between them, ZERO embedded-titled roles, 3 India rows. They were pure noise in the DB and the review queue, so they are off. Adapters remain in src/adapters/feeds.js - re-add a name here to revive one. Adzuna is the opposite case: the only source with real Indian-market (Naukri/Indeed-tier) coverage. It needs a free key from developer.adzuna.com in ADZUNA_APP_ID / ADZUNA_APP_KEY; until those are set it raises a clearly-named error each cycle rather than failing quietly.",
+  "feeds": ["adzuna"],
+
+  "hn": true,
+
+  "_embeddedjobs_comment": "embedded.jobs returned HTTP 500 on every path (/, /jobs, /api/jobs, /jobs.rss) on 2026-09-11 - the site is down, not the adapter. src/adapters/embeddedjobs.js is left in place; flip this back to true and re-check when the site returns.",
+  "embeddedjobs": false,
+
+  "_companies_comment": "Workday slugs are 'tenant:host:site' - all three parts are per-customer and none is derivable from the others, so src/adapters/workday.js:detect() reads them off a careers page for `discover:bulk`. The five below were each verified to return a real job count. Indian embedded startups mostly sit on Keka/Darwinbox/Zoho Recruit, which have no adapter yet - HN 'Who is Hiring' and Adzuna carry more of that niche.",
+  "companies": [
+    { "name": "NXP Semiconductors", "ats": "workday", "slug": "nxp:wd3:careers" },
+    { "name": "Analog Devices", "ats": "workday", "slug": "analogdevices:wd1:External" },
+    { "name": "Micron", "ats": "workday", "slug": "micron:wd1:External" },
+    { "name": "Cadence", "ats": "workday", "slug": "cadence:wd1:External_Careers" },
+    { "name": "Applied Materials", "ats": "workday", "slug": "amat:wd1:External" },
+
+    { "name": "Netradyne", "ats": "greenhouse", "slug": "netradyne" },
+    { "name": "Tulip", "ats": "greenhouse", "slug": "tulip" },
+    { "name": "Groww", "ats": "greenhouse", "slug": "groww" }
+  ]
+}

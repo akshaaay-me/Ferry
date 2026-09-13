@@ -1,0 +1,93 @@
+# One company domain per line. Run: npm run cli discover:bulk config/seed-domains.txt
+# The crawler resolves each to its ATS + slug and stores it in the companies table.
+# Only companies on Greenhouse / Lever / Ashby / Workable / Recruitee / SmartRecruiters
+# will resolve; custom career pages are skipped. Curated for embedded / firmware /
+# edge-AI / robotics / hardware, India-heavy.
+
+# --- Wearables / consumer hardware ---
+ultrahuman.com
+boat-lifestyle.com
+gonoise.com
+boult.com
+pi-ring.com
+
+# --- EV / energy / batteries ---
+atherenergy.com
+exponent.energy
+log9materials.com
+batterysmart.in
+yulu.bike
+euler.energy
+matterenergy.in
+
+# --- Robotics / autonomous ---
+netradyne.com
+greyorange.com
+addverb.com
+unboxrobotics.com
+atimotors.com
+niqorobotics.com
+ottonomy.io
+diligentrobots.com
+
+# --- Space / aerospace (embedded-heavy) ---
+pixxel.space
+digantara.co
+skyroot.in
+agnikul.com
+dhruvaspace.com
+bellatrix.aero
+ideaforge.co.in
+newspaceresearch.com
+
+# --- Industrial / agri IoT ---
+detecttechnologies.com
+stellapps.com
+fasal.co
+cropin.com
+flutura.com
+zenatix.com
+
+# --- Silicon / edge-AI chips ---
+sima.ai
+mythic.ai
+hailo.ai
+blaize.com
+
+# --- Embedded services / global with India R&D ---
+tataelxsi.com
+einfochips.com
+pathpartnertech.com
+ignitarium.com
+sasken.com
+
+# --- Global hardware/robotics startups (often remote / relocation) ---
+particle.io
+golioth.io
+memfault.com
+formant.io
+tulip.co
+
+# --- Workday-based embedded employers (large India R&D sites) ---
+# src/adapters/workday.js:detect() reads tenant:host:site off these careers pages.
+# NXP / Analog Devices / Micron / Cadence / Applied Materials are already seeded
+# directly in config/targets.json; these are the ones whose site name had to be
+# discovered rather than guessed.
+ti.com
+bosch.com
+continental.com
+qualcomm.com
+honeywell.com
+siemens.com
+micron.com
+westerndigital.com
+garmin.com
+synopsys.com
+infineon.com
+st.com
+renesas.com
+microchip.com
+nordicsemi.com
+silabs.com
+lattice-semi.com
+marvell.com

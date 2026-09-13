@@ -1,0 +1,303 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>job agent · profile</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  main { max-width:44rem; margin:1.5rem auto; padding:0 6rem 4rem 1.5rem; display:grid; gap:1.2rem }
+  fieldset { border:1px solid var(--line); border-radius:10px; padding:1rem 1.1rem; display:grid; gap:.7rem }
+  legend { padding:0 .4rem; color:var(--dim); font-size:.8rem; text-transform:uppercase; letter-spacing:.04em }
+  label { display:grid; gap:.25rem; font-size:.85rem; color:var(--dim) }
+  input, textarea { width:100%; font:inherit }
+  textarea { resize:vertical; min-height:3.2em }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:.6rem }
+  .item { border:1px solid var(--line); border-radius:8px; padding:.8rem; display:grid; gap:.5rem; position:relative }
+  .item .remove { position:absolute; top:.5rem; right:.5rem; font-size:.72rem; padding:.15rem .45rem }
+  .bullet { border-left:2px solid var(--line); padding-left:.6rem; display:grid; gap:.35rem }
+  .id { color:var(--dim); font-size:.75rem; font-family:ui-monospace,monospace }
+  .bar { position:fixed; bottom:0; left:0; right:0; padding:.8rem 1.5rem; background:var(--card); border-top:1px solid var(--line); display:flex; gap:.6rem; align-items:center }
+  .bar button { padding:.5rem 1.1rem }
+  #save { background:var(--acc); color:#0f1115; font-weight:600; border:none }
+  .status { color:var(--dim); font-size:.85rem }
+</style>
+
+<header>
+  <h1>profile</h1>
+  <nav class="topnav">
+    <a href="/">review</a>
+    <a href="/profile.html">profile</a>
+    <a href="/settings.html">settings</a>
+    <a href="#" id="logout">logout</a>
+  </nav>
+</header>
+<main id="main"></main>
+<div class="bar">
+  <button id="save">save profile</button>
+  <button id="resume">generate resume</button>
+  <span class="status" id="status"></span>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[<>&"']/g,
+  (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
+
+let profile = null;
+let skillGroups = []; // [{group, skills:[...]}] - editing view of profile.skills, converted back on save
+
+function nextId(ids, prefix) {
+  const nums = ids.filter((id) => id && id.startsWith(prefix))
+    .map((id) => parseInt(id.slice(prefix.length), 10)).filter(Number.isFinite);
+  return `${prefix}${(nums.length ? Math.max(...nums) : 0) + 1}`;
+}
+
+function tagsToStr(t) { return (t || []).join(', '); }
+function strToTags(s) { return s.split(',').map((t) => t.trim()).filter(Boolean); }
+
+// --- Basics ---
+function renderBasics() {
+  const b = profile.basics;
+  const links = b.links || (b.links = {});
+  return `
+  <fieldset>
+    <legend>basics</legend>
+    <div class="grid2">
+      <label>name <input data-bind="basics.name" value="${esc(b.name)}"></label>
+      <label>headline <input data-bind="basics.headline" value="${esc(b.headline)}"></label>
+      <label>email <input data-bind="basics.email" value="${esc(b.email)}"></label>
+      <label>phone <input data-bind="basics.phone" value="${esc(b.phone)}"></label>
+      <label>location <input data-bind="basics.location" value="${esc(b.location)}"></label>
+      <label>work preference <input data-bind="basics.work_preference" value="${esc(b.work_preference)}"></label>
+      <label>github <input data-bind="basics.links.github" value="${esc(links.github)}"></label>
+      <label>linkedin <input data-bind="basics.links.linkedin" value="${esc(links.linkedin)}"></label>
+      <label>site <input data-bind="basics.links.site" value="${esc(links.site)}"></label>
+    </div>
+  </fieldset>`;
+}
+
+function wireBasics(root) {
+  root.querySelectorAll('[data-bind]').forEach((el) => {
+    el.oninput = () => {
+      const path = el.dataset.bind.split('.');
+      let obj = profile;
+      for (let i = 0; i < path.length - 1; i++) obj = obj[path[i]];
+      obj[path.at(-1)] = el.value;
+    };
+  });
+}
+
+// --- Skills ---
+function renderSkills() {
+  const rows = skillGroups.map((g, i) => `
+    <div class="item">
+      <button type="button" class="remove" data-remove-skill="${i}">remove</button>
+      <label>group <input data-skill-group="${i}" value="${esc(g.group)}"></label>
+      <label>skills (comma-separated) <input data-skill-list="${i}" value="${esc(tagsToStr(g.skills))}"></label>
+    </div>`).join('');
+  return `<fieldset><legend>skills</legend>${rows}<button type="button" id="add-skill">add group</button></fieldset>`;
+}
+
+function wireSkills(root) {
+  root.querySelectorAll('[data-skill-group]').forEach((el) => {
+    el.oninput = () => { skillGroups[+el.dataset.skillGroup].group = el.value; };
+  });
+  root.querySelectorAll('[data-skill-list]').forEach((el) => {
+    el.oninput = () => { skillGroups[+el.dataset.skillList].skills = strToTags(el.value); };
+  });
+  root.querySelectorAll('[data-remove-skill]').forEach((el) => {
+    el.onclick = () => { skillGroups.splice(+el.dataset.removeSkill, 1); renderAll(); };
+  });
+  $('#add-skill', root).onclick = () => { skillGroups.push({ group: '', skills: [] }); renderAll(); };
+}
+
+// --- Experience ---
+function renderExperience() {
+  const items = profile.experience.map((e, ei) => {
+    const bullets = e.bullets.map((b, bi) => `
+      <div class="bullet">
+        <div class="id">${esc(b.id)}</div>
+        <textarea data-exp="${ei}" data-bullet="${bi}" data-field="text">${esc(b.text)}</textarea>
+        <input data-exp="${ei}" data-bullet="${bi}" data-field="tags" value="${esc(tagsToStr(b.tags))}" placeholder="tags, comma-separated">
+        <button type="button" class="remove" data-remove-bullet="${ei}:${bi}" style="justify-self:start">remove bullet</button>
+      </div>`).join('');
+    return `
+    <div class="item">
+      <button type="button" class="remove" data-remove-exp="${ei}">remove role</button>
+      <div class="grid2">
+        <label>company <input data-exp="${ei}" data-field="company" value="${esc(e.company)}"></label>
+        <label>role <input data-exp="${ei}" data-field="role" value="${esc(e.role)}"></label>
+        <label>start (YYYY-MM) <input data-exp="${ei}" data-field="start" value="${esc(e.start)}"></label>
+        <label>end (YYYY-MM or Present) <input data-exp="${ei}" data-field="end" value="${esc(e.end)}"></label>
+        <label>location <input data-exp="${ei}" data-field="location" value="${esc(e.location)}"></label>
+      </div>
+      ${bullets}
+      <button type="button" data-add-bullet="${ei}" style="justify-self:start">add bullet</button>
+    </div>`;
+  }).join('');
+  return `<fieldset><legend>experience</legend>${items}<button type="button" id="add-exp">add role</button></fieldset>`;
+}
+
+function wireExperience(root) {
+  root.querySelectorAll('[data-exp][data-field]:not([data-bullet])').forEach((el) => {
+    el.oninput = () => { profile.experience[+el.dataset.exp][el.dataset.field] = el.value; };
+  });
+  root.querySelectorAll('[data-bullet]').forEach((el) => {
+    el.oninput = () => {
+      const b = profile.experience[+el.dataset.exp].bullets[+el.dataset.bullet];
+      b[el.dataset.field] = el.dataset.field === 'tags' ? strToTags(el.value) : el.value;
+    };
+  });
+  root.querySelectorAll('[data-remove-bullet]').forEach((el) => {
+    el.onclick = () => {
+      const [ei, bi] = el.dataset.removeBullet.split(':').map(Number);
+      profile.experience[ei].bullets.splice(bi, 1);
+      renderAll();
+    };
+  });
+  root.querySelectorAll('[data-remove-exp]').forEach((el) => {
+    el.onclick = () => { profile.experience.splice(+el.dataset.removeExp, 1); renderAll(); };
+  });
+  root.querySelectorAll('[data-add-bullet]').forEach((el) => {
+    el.onclick = () => {
+      const ei = +el.dataset.addBullet;
+      const ids = profile.experience[ei].bullets.map((b) => b.id);
+      const prefix = `b${ei}-`;
+      profile.experience[ei].bullets.push({ id: nextId(ids, prefix), text: '', tags: [] });
+      renderAll();
+    };
+  });
+  $('#add-exp', root).onclick = () => {
+    profile.experience.push({ company: '', role: '', start: '', end: 'Present', location: '', bullets: [] });
+    renderAll();
+  };
+}
+
+// --- Projects ---
+function renderProjects() {
+  const items = profile.projects.map((p, i) => `
+    <div class="item">
+      <button type="button" class="remove" data-remove-proj="${i}">remove</button>
+      <div class="id">${esc(p.id)}</div>
+      <label>name <input data-proj="${i}" data-field="name" value="${esc(p.name)}"></label>
+      <label>description <textarea data-proj="${i}" data-field="text">${esc(p.text)}</textarea></label>
+      <label>tags <input data-proj="${i}" data-field="tags" value="${esc(tagsToStr(p.tags))}"></label>
+    </div>`).join('');
+  return `<fieldset><legend>projects</legend>${items}<button type="button" id="add-proj">add project</button></fieldset>`;
+}
+
+function wireProjects(root) {
+  root.querySelectorAll('[data-proj]').forEach((el) => {
+    el.oninput = () => {
+      const p = profile.projects[+el.dataset.proj];
+      p[el.dataset.field] = el.dataset.field === 'tags' ? strToTags(el.value) : el.value;
+    };
+  });
+  root.querySelectorAll('[data-remove-proj]').forEach((el) => {
+    el.onclick = () => { profile.projects.splice(+el.dataset.removeProj, 1); renderAll(); };
+  });
+  $('#add-proj', root).onclick = () => {
+    const ids = profile.projects.map((p) => p.id);
+    profile.projects.push({ id: nextId(ids, 'pr'), name: '', text: '', tags: [] });
+    renderAll();
+  };
+}
+
+// --- Education ---
+function renderEducation() {
+  const items = profile.education.map((ed, i) => `
+    <div class="item">
+      <button type="button" class="remove" data-remove-edu="${i}">remove</button>
+      <div class="id">${esc(ed.id)}</div>
+      <div class="grid2">
+        <label>school <input data-edu="${i}" data-field="school" value="${esc(ed.school)}"></label>
+        <label>degree <input data-edu="${i}" data-field="degree" value="${esc(ed.degree)}"></label>
+        <label>year <input data-edu="${i}" data-field="year" value="${esc(ed.year)}"></label>
+      </div>
+    </div>`).join('');
+  return `<fieldset><legend>education</legend>${items}<button type="button" id="add-edu">add education</button></fieldset>`;
+}
+
+function wireEducation(root) {
+  root.querySelectorAll('[data-edu]').forEach((el) => {
+    el.oninput = () => { profile.education[+el.dataset.edu][el.dataset.field] = el.value; };
+  });
+  root.querySelectorAll('[data-remove-edu]').forEach((el) => {
+    el.onclick = () => { profile.education.splice(+el.dataset.removeEdu, 1); renderAll(); };
+  });
+  $('#add-edu', root).onclick = () => {
+    const ids = profile.education.map((e) => e.id);
+    profile.education.push({ id: nextId(ids, 'ed'), school: '', degree: '', year: '' });
+    renderAll();
+  };
+}
+
+// --- Stories (STAR interview prep) ---
+function renderStories() {
+  const items = profile.stories.map((s, i) => `
+    <div class="item">
+      <button type="button" class="remove" data-remove-story="${i}">remove</button>
+      <div class="id">${esc(s.id)}</div>
+      <label>prompt <input data-story="${i}" data-field="prompt" value="${esc(s.prompt)}"></label>
+      <label>situation <textarea data-story="${i}" data-field="situation">${esc(s.situation)}</textarea></label>
+      <label>task <textarea data-story="${i}" data-field="task">${esc(s.task)}</textarea></label>
+      <label>action <textarea data-story="${i}" data-field="action">${esc(s.action)}</textarea></label>
+      <label>result <textarea data-story="${i}" data-field="result">${esc(s.result)}</textarea></label>
+      <label>tags <input data-story="${i}" data-field="tags" value="${esc(tagsToStr(s.tags))}"></label>
+    </div>`).join('');
+  return `<fieldset><legend>interview stories (STAR)</legend>${items}<button type="button" id="add-story">add story</button></fieldset>`;
+}
+
+function wireStories(root) {
+  root.querySelectorAll('[data-story]').forEach((el) => {
+    el.oninput = () => {
+      const s = profile.stories[+el.dataset.story];
+      s[el.dataset.field] = el.dataset.field === 'tags' ? strToTags(el.value) : el.value;
+    };
+  });
+  root.querySelectorAll('[data-remove-story]').forEach((el) => {
+    el.onclick = () => { profile.stories.splice(+el.dataset.removeStory, 1); renderAll(); };
+  });
+  $('#add-story', root).onclick = () => {
+    const ids = profile.stories.map((s) => s.id);
+    profile.stories.push({ id: nextId(ids, 'st'), prompt: '', situation: '', task: '', action: '', result: '', tags: [] });
+    renderAll();
+  };
+}
+
+function renderAll() {
+  const main = $('#main');
+  main.innerHTML = renderBasics() + renderSkills() + renderExperience() + renderProjects() + renderEducation() + renderStories();
+  wireBasics(main); wireSkills(main); wireExperience(main); wireProjects(main); wireEducation(main); wireStories(main);
+}
+
+async function load() {
+  profile = await (await fetch('/api/profile')).json();
+  skillGroups = Object.entries(profile.skills || {}).map(([group, skills]) => ({ group, skills }));
+  renderAll();
+}
+
+$('#save').onclick = async () => {
+  profile.skills = Object.fromEntries(skillGroups.filter((g) => g.group).map((g) => [g.group, g.skills]));
+  const res = await fetch('/api/profile', {
+    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(profile),
+  });
+  const data = await res.json();
+  $('#status').textContent = res.ok ? 'saved.' : `error: ${data.error}`;
+};
+
+$('#resume').onclick = async () => {
+  const btn = $('#resume');
+  btn.disabled = true; btn.textContent = 'generating…';
+  const res = await (await fetch('/api/profile/resume', { method: 'POST' })).json();
+  btn.disabled = false; btn.textContent = 'generate resume';
+  $('#status').textContent = res.ok ? '' : `error: ${res.error}`;
+  if (res.ok) window.open(res.pdf || res.html, '_blank');
+};
+
+$('#logout').onclick = async (e) => {
+  e.preventDefault();
+  await fetch('/api/logout', { method: 'POST' });
+  location.href = '/login.html';
+};
+
+load();
+</script>

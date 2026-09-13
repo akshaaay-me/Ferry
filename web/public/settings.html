@@ -1,0 +1,94 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>job agent · settings</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  main { max-width:34rem; margin:1.5rem auto; padding:0 1.5rem; display:grid; gap:1.2rem }
+  fieldset { border:1px solid var(--line); border-radius:10px; padding:1rem 1.1rem; display:grid; gap:.6rem }
+  legend { padding:0 .4rem; color:var(--dim); font-size:.8rem; text-transform:uppercase; letter-spacing:.04em }
+  label { display:grid; gap:.25rem; font-size:.85rem; color:var(--dim) }
+  input { width:100% }
+  .row { display:flex; gap:.6rem; align-items:center }
+  .hint { color:var(--dim); font-size:.78rem; margin:0 }
+</style>
+
+<header>
+  <h1>settings</h1>
+  <nav class="topnav">
+    <a href="/">review</a>
+    <a href="/profile.html">profile</a>
+    <a href="/settings.html">settings</a>
+    <a href="#" id="logout">logout</a>
+  </nav>
+</header>
+<main>
+  <p class="hint">Leave a field blank to fall back to its .env value. See .env.example for provider recipes (OpenRouter, Groq, Ollama, ...).</p>
+
+  <fieldset>
+    <legend>provider</legend>
+    <label>provider <input id="provider" placeholder="anthropic (default) or openai"></label>
+    <label>base url <input id="base_url" placeholder="https://openrouter.ai/api/v1"></label>
+    <label>api key <input id="api_key" type="password" placeholder="sk-or-..."></label>
+    <label>model <input id="model" placeholder="deepseek/deepseek-chat-v3.1:free"></label>
+  </fieldset>
+
+  <fieldset>
+    <legend>anthropic (used when provider is anthropic)</legend>
+    <label>anthropic api key <input id="anthropic_api_key" type="password" placeholder="sk-ant-..."></label>
+    <label>anthropic model <input id="anthropic_model" placeholder="claude-sonnet-4-6"></label>
+  </fieldset>
+
+  <fieldset>
+    <legend>per-stage overrides</legend>
+    <label>score model <input id="score_model" placeholder="cheap model, runs ~40x per cycle"></label>
+    <label>tailor model <input id="tailor_model" placeholder="quality model, runs on demand"></label>
+  </fieldset>
+
+  <fieldset>
+    <legend>embeddings (optional)</legend>
+    <label>voyage api key <input id="voyage_api_key" type="password"></label>
+  </fieldset>
+
+  <div class="row">
+    <button id="save">save</button>
+    <button id="test" type="button">test connection</button>
+  </div>
+  <div class="note" id="result" hidden></div>
+</main>
+
+<script>
+const FIELDS = ['provider','base_url','api_key','model','anthropic_api_key','anthropic_model','score_model','tailor_model','voyage_api_key'];
+const $ = (s) => document.querySelector(s);
+
+async function load() {
+  const settings = await (await fetch('/api/settings')).json();
+  for (const f of FIELDS) $('#' + f).value = settings[f] || '';
+}
+
+$('#save').onclick = async () => {
+  const body = {};
+  for (const f of FIELDS) body[f] = $('#' + f).value;
+  await fetch('/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const el = $('#result');
+  el.hidden = false;
+  el.textContent = 'saved.';
+};
+
+$('#test').onclick = async () => {
+  const btn = $('#test');
+  btn.disabled = true; btn.textContent = 'testing…';
+  const res = await (await fetch('/api/settings/test', { method: 'POST' })).json();
+  btn.disabled = false; btn.textContent = 'test connection';
+  const el = $('#result');
+  el.hidden = false;
+  el.textContent = res.ok ? `✓ connected — model replied: ${res.reply}` : `✗ ${res.error}`;
+};
+
+$('#logout').onclick = async (e) => {
+  e.preventDefault();
+  await fetch('/api/logout', { method: 'POST' });
+  location.href = '/login.html';
+};
+
+load();
+</script>

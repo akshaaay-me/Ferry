@@ -1,0 +1,494 @@
+{
+  "version": "2026-09",
+  "basics": {
+    "name": "Akshay",
+    "headline": "Embedded Engineer — Embedded AI / Edge AI",
+    "email": "akshayprabhakaran2@gmail.com",
+    "phone": "+91 99020 80604",
+    "location": "Bengaluru, Karnataka, India",
+    "work_preference": "Bengaluru or fully remote preferred; will relocate internationally for a clearly strong embedded-AI / edge-AI opportunity",
+    "links": {
+      "github": "https://github.com/akshaaay-me",
+      "linkedin": "https://www.linkedin.com/in/akshay-prabhakaran11/",
+      "site": ""
+    }
+  },
+  "_match_comment": "Stage 1 of the funnel. Cheap, deterministic, runs on every ingested job.",
+  "match": {
+    "_include_titles_comment": "A title hit is worth as much as the whole keyword basket. Keep this to the embedded/firmware family so software-only roles never clear on title alone.",
+    "include_titles": [
+      "embedded",
+      "embedded ai",
+      "edge ai",
+      "embedded engineer",
+      "embedded software",
+      "embedded systems",
+      "embedded linux",
+      "firmware",
+      "rtos",
+      "bare metal",
+      "bare-metal",
+      "device driver",
+      "bsp",
+      "board support",
+      "bootloader",
+      "microcontroller",
+      "mcu",
+      "iot",
+      "automotive embedded",
+      "automotive software",
+      "hardware",
+      "wearable",
+      "tinyml",
+      "sensor",
+      "robotics"
+    ],
+    "_exclude_titles_comment": "Hard zero - deterministically rejected, never shown. Pure software / non-embedded roles. 'Embedded Software Engineer' still passes because 'embedded' matches include_titles first only for scoring; these are substring checks on the title, so keep them specific enough not to catch an embedded role.",
+    "exclude_titles": [
+      "sales",
+      "recruiter",
+      "intern",
+      "manager, people",
+      "account executive",
+      "customer success",
+      "sdet",
+      "qa analyst",
+      "support engineer",
+      "data engineer",
+      "data scientist",
+      "data analyst",
+      "analytics engineer",
+      "machine learning engineer",
+      "ml engineer",
+      "backend engineer",
+      "back-end engineer",
+      "back end engineer",
+      "frontend",
+      "front-end",
+      "front end",
+      "full stack",
+      "full-stack",
+      "fullstack",
+      "web developer",
+      "web engineer",
+      "devops",
+      "site reliability",
+      "sre engineer",
+      "solutions architect",
+      "solution architect",
+      "cloud engineer",
+      "cloud architect",
+      "database administrator",
+      "salesforce",
+      "mulesoft",
+      "servicenow",
+      "sap ",
+      "android developer",
+      "ios developer",
+      "mobile developer",
+      "java developer",
+      ".net developer",
+      "php developer",
+      "ruby on rails",
+      "wordpress",
+      "product manager",
+      "project manager",
+      "program manager",
+      "business analyst",
+      "scrum master",
+      "ui/ux",
+      "graphic designer"
+    ],
+    "_exclude_seniority_comment": "These now RANK DOWN rather than reject (see seniority_penalty). That is why 'senior' and 'lead' are safe to list here - before the penalty existed, listing them would have hard-zeroed half the embedded market. Senior JDs are keyword-dense and otherwise sweep the whole 40-row LLM budget away from the mid-level roles you are actually likely to get.",
+    "exclude_seniority": [
+      "senior",
+      "sr.",
+      "lead",
+      "principal",
+      "staff",
+      "manager",
+      "director",
+      "vp ",
+      "head of",
+      "architect"
+    ],
+    "locations": [
+      "bengaluru",
+      "bangalore",
+      "india",
+      "remote"
+    ],
+    "remote_ok": true,
+    "_seniority_comment": "Soft rank penalty for in-domain titles matching exclude_seniority[], NOT a kill - score.js grades the stretch with the full JD. Senior/staff JDs are keyword-dense and would otherwise sweep the whole 40-row LLM budget away from junior and mid roles. Raise toward 1.0 to see more senior stretches, lower to focus on your own level.",
+    "seniority_penalty": 0.6,
+    "_off_location_comment": "Score multiplier for roles outside locations[] above. Not a kill - abroad roles still reach the LLM and the review queue, just ranked lower. Raise toward 1.0 to see more international roles, lower to focus on Bengaluru/remote.",
+    "off_location_penalty": 0.75,
+    "exclude_companies": [],
+    "keywords": {
+      "stm32": 4,
+      "stm32u5": 3,
+      "arm cortex": 3,
+      "esp32": 4,
+      "esp-idf": 4,
+      "embedded ai": 5,
+      "edge ai": 5,
+      "tinyml": 4,
+      "tflite": 3,
+      "tensorflow lite": 4,
+      "int8 quantization": 3,
+      "stm32cubeai": 3,
+      "x-cube-ai": 3,
+      "firmware": 4,
+      "embedded c": 4,
+      "rtos": 3,
+      "freertos": 3,
+      "imu": 3,
+      "sensor fusion": 3,
+      "ahrs": 2,
+      "gps": 2,
+      "ble": 3,
+      "bluetooth low energy": 3,
+      "ant+": 3,
+      "lora": 2,
+      "cellular": 2,
+      "nb-iot": 2,
+      "opencv": 3,
+      "computer vision": 2,
+      "yolo": 3,
+      "wearable": 3,
+      "sports tech": 3,
+      "hardware": 2,
+      "activity recognition": 3,
+      "microcontroller": 3,
+      "device driver": 3,
+      "linux kernel": 3,
+      "yocto": 3,
+      "can bus": 3,
+      "autosar": 3,
+      "i2c": 2,
+      "spi": 2,
+      "uart": 2,
+      "jtag": 2,
+      "bootloader": 2,
+      "docker": 1,
+      "python": 1,
+      "rust": 2,
+      "c++": 2,
+      "embedded c++": 3
+    }
+  },
+  "_bullets_comment": "The tailoring model may ONLY select and rephrase bullets from this inventory. Every id it returns is validated against this file before rendering. Nothing gets invented.",
+  "skills": {
+    "Embedded": [
+      "STM32",
+      "STM32U5",
+      "ARM Cortex-M",
+      "ESP-IDF",
+      "ESP32-S3",
+      "FreeRTOS",
+      "BLE",
+      "ANT+",
+      "GPS",
+      "IMU",
+      "Embedded C"
+    ],
+    "Embedded AI / Edge AI": [
+      "TensorFlow Lite",
+      "INT8 Quantization",
+      "STM32CubeAI / X-CUBE-AI",
+      "On-device inference",
+      "TinyML"
+    ],
+    "Backend & Infra": [
+      "Node.js",
+      "PostgreSQL",
+      "Docker",
+      "PM2",
+      "EC2",
+      "Cloudflare",
+      "Azure"
+    ],
+    "Frontend": [
+      "React",
+      "React Native",
+      "Admin dashboards",
+      "Desktop apps"
+    ],
+    "AI / CV": [
+      "OpenCV",
+      "YOLO",
+      "Player tracking",
+      "Object detection",
+      "Edge inference"
+    ]
+  },
+  "experience": [
+    {
+      "company": "FanplayIoT",
+      "role": "Associate Embedded Engineer",
+      "start": "2025-06",
+      "end": "Present",
+      "location": "Bengaluru, IN",
+      "bullets": [
+        {
+          "id": "fp1",
+          "text": "Built firmware for BLE + ANT+ wearable devices on ESP32-S3, covering sensor acquisition, power management, and OTA update paths.",
+          "tags": [
+            "embedded",
+            "ble",
+            "esp32",
+            "firmware"
+          ]
+        },
+        {
+          "id": "fp2",
+          "text": "Designed the Smart Jersey athlete-monitoring product end to end: hardware bring-up, firmware, ingestion API, and the dashboard coaches actually used courtside.",
+          "tags": [
+            "embedded",
+            "product",
+            "fullstack",
+            "wearable",
+            "sportstech"
+          ]
+        },
+        {
+          "id": "fp3",
+          "text": "Integrated GPS and IMU streams into a live telemetry pipeline, handling clock skew and lossy BLE links across dozens of concurrent devices.",
+          "tags": [
+            "embedded",
+            "sensor-fusion",
+            "gps",
+            "imu",
+            "realtime"
+          ]
+        },
+        {
+          "id": "fp4",
+          "text": "Ran a summer-camp deployment monitoring live athletes, then debugged the field failures that only appear with real users on real hardware.",
+          "tags": [
+            "field-ops",
+            "debugging",
+            "product",
+            "wearable"
+          ]
+        },
+        {
+          "id": "fp5",
+          "text": "Stood up the backend on EC2 with Docker, PM2, PostgreSQL and Cloudflare, including deploys, monitoring, and incident response.",
+          "tags": [
+            "devops",
+            "backend",
+            "aws",
+            "docker",
+            "postgres"
+          ]
+        },
+        {
+          "id": "fp6",
+          "text": "Built React admin dashboards and mobile apps for device provisioning, live session views, and historical athlete analytics.",
+          "tags": [
+            "frontend",
+            "react",
+            "fullstack"
+          ]
+        }
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "id": "pr1",
+      "name": "Football video analysis",
+      "text": "Built a computer-vision pipeline using YOLO and OpenCV for player tracking and ball detection on match footage, including homography to pitch coordinates and per-player movement stats.",
+      "tags": [
+        "cv",
+        "opencv",
+        "yolo",
+        "ai",
+        "sportstech"
+      ]
+    },
+    {
+      "id": "pr2",
+      "name": "Star Singer System",
+      "text": "Delivered a live event scoring and display system used in production, spanning device input, backend state, and an operator-facing UI.",
+      "tags": [
+        "fullstack",
+        "realtime",
+        "product"
+      ]
+    },
+    {
+      "id": "pr3",
+      "name": "STM32U585 Embedded AI Activity Recognition",
+      "text": "Built an on-device activity recognition system on STM32U585: IMU data acquisition at 50 Hz over a standing/walking/squatting dataset, TensorFlow Lite model training with INT8 quantization, and deployment via STM32CubeAI / X-CUBE-AI for real-time on-device inference.",
+      "tags": [
+        "embedded-ai",
+        "edge-ai",
+        "stm32",
+        "tinyml",
+        "tflite",
+        "imu",
+        "activity-recognition"
+      ]
+    },
+    {
+      "id": "pr4",
+      "name": "STEVAL-MKBOXPROA Sensor & Motion Processing",
+      "text": "Built sensor and motion processing on STM32U585 with the LSM6DSV16X IMU plus magnetometer and barometer: accelerometer/gyro/magnetometer fusion via a Mahony AHRS filter for roll/pitch/yaw estimation, including sensor calibration and debugging.",
+      "tags": [
+        "embedded",
+        "stm32",
+        "imu",
+        "ahrs",
+        "sensor-fusion"
+      ]
+    },
+    {
+      "id": "pr5",
+      "name": "Smart Bat / Cricket Bat Motion Tracking",
+      "text": "Built motion and orientation tracking for a smart cricket bat on ESP32-S3 with the QMI8658A IMU and sensor fusion, including real-time 3D bat visualization in Three.js and exploration of ball/bat detection using a high-FPS global-shutter camera.",
+      "tags": [
+        "embedded",
+        "esp32",
+        "imu",
+        "sensor-fusion",
+        "sportstech",
+        "cv"
+      ]
+    },
+    {
+      "id": "pr6",
+      "name": "ESP32 Vehicle Black Box",
+      "text": "Built a self-contained vehicle black box on ESP32 integrating an MPU6050 IMU, GPS, GSM, and microSD: logs motion and trip events to the SD card with GPS location and timestamps, and transmits data over the cellular link. Covers the full embedded stack - multi-peripheral sensor acquisition, local storage, and remote uplink on a single MCU.",
+      "tags": [
+        "embedded",
+        "esp32",
+        "imu",
+        "mpu6050",
+        "gps",
+        "gsm",
+        "microsd",
+        "cellular",
+        "telematics",
+        "data-logging"
+      ]
+    },
+    {
+      "id": "pr7",
+      "name": "STM32 SD Card Data Logger",
+      "text": "Built an SD card data logger on STM32U5 (SDMMC1, FatFs) for CSV logging of BLE heart-rate data, including HR and RR interval logging.",
+      "tags": [
+        "embedded",
+        "stm32",
+        "ble",
+        "data-logging"
+      ]
+    },
+    {
+      "id": "pr8",
+      "name": "Smart Jersey — Heart Rate Monitoring",
+      "text": "Built a wearable heart-rate monitoring system with BLE/ANT+ communication for sports monitoring, field-tested during a Kerala Super League summer camp.",
+      "tags": [
+        "wearable",
+        "ble",
+        "ant+",
+        "sportstech"
+      ]
+    },
+    {
+      "id": "pr9",
+      "name": "Polar H10 / CardioSim Heart-Rate Receiver",
+      "text": "Built a BLE heart-rate receiver interoperating with a Polar H10 and CardioSim III over ANT+/BLE dongles, and investigated replacing the external dongle with an STM32 MCU.",
+      "tags": [
+        "ble",
+        "ant+",
+        "stm32",
+        "heart-rate"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "id": "ed1",
+      "school": "AMC Engineering College",
+      "degree": "B.E., Electronics and Communication Engineering",
+      "year": "2023"
+    },
+    {
+      "id": "ed2",
+      "school": "National College",
+      "degree": "Pre-University Course (Class XII), Science",
+      "year": "2019"
+    },
+    {
+      "id": "ed3",
+      "school": "Shri Sharada Vidyaniketan",
+      "degree": "SSLC (Class X)",
+      "year": "2017"
+    }
+  ],
+  "_stories_comment": "Interview prep inventory (STAR format). Same guardrail as the resume bullets: src/interview/prep.js may only reference stories by their exact 'id' and select/reframe which ones answer a given question - it cannot invent a situation, action, or result that isn't written here. Fill in every REPLACE_ME with the real outcome before trusting a prep output in an actual interview.",
+  "stories": [
+    {
+      "id": "st1",
+      "prompt": "Tell me about a time you debugged a hard problem you only saw in the field, not in testing.",
+      "situation": "FanplayIoT's Smart Jersey wearables were deployed to monitor live athletes during a Kerala Super League summer camp.",
+      "task": "Keep BLE heart-rate, GPS, and IMU telemetry reliable across dozens of concurrent devices under real field conditions.",
+      "action": "Integrated GPS and IMU into the live telemetry pipeline, handled clock skew between devices, and worked through lossy BLE links dropping packets across many concurrent devices - debugging failures that never showed up on a bench with one device.",
+      "result": "REPLACE_ME - what changed after the fix (uptime/drop-rate before vs after, whether the camp ran without further incident, any number you can point to).",
+      "tags": [
+        "debugging",
+        "field-ops",
+        "wearable",
+        "ble",
+        "gps",
+        "imu"
+      ]
+    },
+    {
+      "id": "st2",
+      "prompt": "Tell me about a project you owned end to end.",
+      "situation": "FanplayIoT needed an athlete-monitoring product (Smart Jersey) built from nothing.",
+      "task": "Take it from hardware bring-up through to something coaches would actually use courtside.",
+      "action": "Built the firmware for BLE + ANT+ wearables on ESP32-S3, the backend ingestion API, and the React dashboard coaches used, plus stood up the EC2/Docker/PM2/Postgres/Cloudflare infrastructure behind it.",
+      "result": "REPLACE_ME - adoption or usage detail (how many coaches/athletes, how it changed what they could see mid-session).",
+      "tags": [
+        "ownership",
+        "fullstack",
+        "embedded",
+        "product",
+        "wearable"
+      ]
+    },
+    {
+      "id": "st3",
+      "prompt": "Tell me about a technically challenging project outside your day job.",
+      "situation": "Wanted on-device activity recognition (standing/walking/squatting) running entirely on an STM32U585, no cloud round-trip.",
+      "task": "Get a trained ML model small and fast enough to run inference directly on the MCU in real time.",
+      "action": "Collected an IMU dataset at 50 Hz across the three activities, trained a TensorFlow Lite model, applied INT8 quantization to fit the target footprint, and deployed it via STM32CubeAI / X-CUBE-AI.",
+      "result": "REPLACE_ME - accuracy achieved, inference latency/memory footprint on-device, or anything quantified.",
+      "tags": [
+        "embedded-ai",
+        "edge-ai",
+        "stm32",
+        "tinyml",
+        "activity-recognition"
+      ]
+    },
+    {
+      "id": "st4",
+      "prompt": "Tell me about a production incident you handled.",
+      "situation": "FanplayIoT's backend (EC2, Docker, PM2, PostgreSQL, Cloudflare) served live telemetry during athlete monitoring sessions.",
+      "task": "Keep it up and respond fast when something broke, since the data was time-sensitive (live sessions, not batch).",
+      "action": "Owned deploys, monitoring, and incident response on that stack end to end.",
+      "result": "REPLACE_ME - a specific incident: what broke, how you found it, how long it took to fix, what you changed so it wouldn't happen again.",
+      "tags": [
+        "devops",
+        "incident-response",
+        "backend",
+        "reliability"
+      ]
+    }
+  ]
+}

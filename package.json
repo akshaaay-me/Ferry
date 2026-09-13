@@ -1,0 +1,20 @@
+{
+  "name": "job-agent",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "ATS-first job discovery + resume tailoring pipeline. Applying stays manual.",
+  "scripts": {
+    "start": "node src/index.js",
+    "web": "node web/server.js",
+    "cli": "node src/cli.js",
+    "migrate": "node src/db.js --migrate"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3",
+    "pg": "^8.12.0"
+  },
+  "engines": { "node": ">=20" }
+}

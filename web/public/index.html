@@ -1,0 +1,224 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>job agent · review queue</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  main { max-width:60rem; margin:1.5rem auto; padding:0 1.5rem; display:grid; gap:.9rem }
+  .job { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:1rem 1.1rem }
+  .job.viewed .title, .job.viewed .score { opacity:.55 }
+  .seen { color:var(--dim); font-size:.72rem; border:1px solid var(--line); border-radius:4px; padding:0 .35rem; margin-left:.3rem }
+  .top { display:flex; gap:.8rem; align-items:baseline; flex-wrap:wrap }
+  .score { font-variant-numeric:tabular-nums; font-weight:700; color:var(--acc); min-width:3ch }
+  .title { font-weight:600 }
+  .co { color:var(--dim) }
+  .meta { color:var(--dim); font-size:.82rem; margin-top:.15rem }
+  .dims { color:var(--dim); font-size:.78rem; margin-top:.35rem; display:flex; gap:.9rem; flex-wrap:wrap }
+  .dims b { color:var(--fg); font-weight:600 }
+  .verdict { margin:.6rem 0 0; }
+  .gaps { color:var(--warn); font-size:.85rem; margin-top:.3rem }
+  .actions { display:flex; gap:.5rem; margin-top:.8rem; flex-wrap:wrap; align-items:center }
+  .note.timeline { border-left-color:var(--dim) }
+  .timeline-row { display:flex; gap:.6rem; color:var(--dim) }
+  .timeline-row b { color:var(--fg) }
+  .empty { color:var(--dim); text-align:center; padding:3rem }
+</style>
+
+<header>
+  <h1>review queue</h1>
+  <select id="status">
+    <option value="inbox">inbox</option>
+    <option value="shortlist">shortlist</option>
+    <option value="applied">applied</option>
+    <option value="phone_screen">phone screen</option>
+    <option value="interview">interview</option>
+    <option value="offer">offer</option>
+    <option value="rejected">rejected</option>
+    <option value="withdrawn">withdrawn</option>
+    <option value="skipped">skipped</option>
+    <option value="all">all</option>
+  </select>
+  <select id="min">
+    <option value="0" selected>all scores</option>
+    <option value="0.3">score ≥ 0.3</option>
+    <option value="0.4">score ≥ 0.4</option>
+    <option value="0.5">score ≥ 0.5</option>
+    <option value="0.65">score ≥ 0.65</option>
+    <option value="0.8">score ≥ 0.8</option>
+  </select>
+  <select id="age">
+    <option value="1" selected>posted &lt; 1d</option>
+    <option value="3">posted &lt; 3d</option>
+    <option value="7">posted &lt; 7d</option>
+    <option value="14">posted &lt; 14d</option>
+    <option value="30">posted &lt; 30d</option>
+    <option value="0">any age</option>
+  </select>
+  <span id="count" class="co"></span>
+  <nav class="topnav">
+    <a href="/">review</a>
+    <a href="/profile.html">profile</a>
+    <a href="/settings.html">settings</a>
+    <a href="#" id="logout">logout</a>
+  </nav>
+</header>
+<main id="list"></main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let jobs = [];
+
+// Job titles, company names and verdict text all come from third-party feeds and
+// land in innerHTML below. Escape everything interpolated from a job row.
+const esc = (v) => String(v ?? '').replace(/[<>&"']/g,
+  (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const STAGES = ['inbox','shortlist','applied','phone_screen','interview','offer','rejected','withdrawn','skipped'];
+const STAGE_LABEL = { inbox:'inbox', shortlist:'shortlist', applied:'applied', phone_screen:'phone screen',
+  interview:'interview', offer:'offer', rejected:'rejected', withdrawn:'withdrawn', skipped:'skipped' };
+
+function timeAgo(iso) {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return '';
+  const s = Math.floor((Date.now() - t) / 1000);
+  if (s < 0) return 'just now';
+  if (s < 3600) return `${Math.max(1, Math.floor(s/60))}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  return `${Math.floor(s/86400)}d ago`;
+}
+
+async function load() {
+  const r = await fetch(`/api/jobs?status=${$('#status').value}&min=${$('#min').value}&age=${$('#age').value}`);
+  jobs = await r.json();
+  $('#count').textContent = `${jobs.length} roles`;
+  render();
+}
+
+function dimsLine(d) {
+  if (!d) return '';
+  const label = { skill_fit:'skill', seniority_fit:'seniority', location_fit:'location', growth_fit:'growth' };
+  return Object.entries(label)
+    .filter(([k]) => d[k] != null)
+    .map(([k, name]) => `${name} <b>${esc(d[k])}/5</b>`)
+    .join(' · ');
+}
+
+function render() {
+  $('#list').innerHTML = jobs.length ? '' : '<div class="empty">nothing here yet — run <code>npm run cli run</code></div>';
+  for (const j of jobs) {
+    const v = j.verdict || {};
+    const el = document.createElement('div');
+    el.className = 'job' + (j.viewed_at ? ' viewed' : '');
+    const stageOptions = STAGES.map((s) =>
+      `<option value="${s}" ${s === j.status ? 'selected' : ''}>${STAGE_LABEL[s]}</option>`).join('');
+    const dims = dimsLine(v.dimensions);
+
+    const scoreCell = j.score != null
+      ? Math.round(j.score * 100)
+      : `<span title="not LLM-scored yet (stage: ${j.stage || '?'}) — keyword score only">kw ${j.keyword_score != null ? Math.round(j.keyword_score * 100) : '–'}</span>`;
+
+    el.innerHTML = `
+      <div class="top">
+        <span class="score">${scoreCell}</span>
+        <span class="title">${esc(j.title)}</span>
+        <span class="co">${esc(j.company)}</span>
+        ${j.viewed_at ? '<span class="seen">seen</span>' : ''}
+      </div>
+      <div class="meta">${[j.location, j.remote ? 'remote' : null, j.salary, j.source, j.posted_at ? 'posted ' + timeAgo(j.posted_at) : null, j.stage && j.stage !== 'scored' ? j.stage : null].filter(Boolean).map(esc).join(' · ')}</div>
+      ${dims ? `<div class="dims">${dims}</div>` : ''}
+      <div class="verdict">${esc(v.verdict || '')}</div>
+      ${v.hard_experience_req > 2 ? `<div class="gaps">requires ${esc(v.hard_experience_req)}+ yrs</div>` : ''}
+      ${v.gaps?.length ? `<div class="gaps">gaps: ${esc(v.gaps.join('; '))}</div>` : ''}
+      <div class="actions">
+        <a href="${esc(j.url)}" target="_blank" rel="noopener noreferrer" data-act="open"><button>open posting →</button></a>
+        <select data-act="stage">${stageOptions}</select>
+        <button data-act="tailor">tailor resume</button>
+        <button data-act="prep">prep interview</button>
+        <button data-act="timeline">timeline</button>
+        ${j.resume ? `<a href="${esc(j.resume.replace(/^.*\/out/, '/out'))}" target="_blank"><button>last resume</button></a>` : ''}
+        ${j.prep_id ? `<button data-act="last-prep">last prep</button>` : ''}
+      </div>
+      <div class="note tailor-note" hidden></div>
+      <div class="note prep-note" hidden></div>
+      <div class="note timeline" hidden></div>`;
+
+    el.querySelector('[data-act="open"]').addEventListener('click', () => {
+      if (j.viewed_at) return;
+      navigator.sendBeacon(`/api/jobs/${j.id}/viewed`);
+      j.viewed_at = new Date().toISOString();
+      el.classList.add('viewed');
+    });
+
+    el.querySelector('[data-act="stage"]').onchange = async (e) => {
+      await fetch(`/api/jobs/${j.id}/status`, {
+        method:'POST', headers:{'content-type':'application/json'},
+        body: JSON.stringify({ status: e.target.value })
+      });
+      load();
+    };
+
+    el.querySelector('[data-act="tailor"]').onclick = async (e) => {
+      const note = el.querySelector('.tailor-note');
+      e.target.textContent = 'writing…'; e.target.disabled = true;
+      const res = await (await fetch(`/api/jobs/${j.id}/tailor`, { method:'POST' })).json();
+      e.target.textContent = 'tailor resume'; e.target.disabled = false;
+      note.hidden = false;
+      note.innerHTML = res.error
+        ? `error: ${esc(res.error)}`
+        : `<b>cover note</b>\n${esc(res.cover_note)}\n\n<a href="${esc(res.pdf || res.html)}" target="_blank">open resume</a>`
+          + (res.dropped?.length ? `\n\n⚠ dropped ${res.dropped.length} unsourced bullet(s)` : '');
+    };
+
+    function renderPrep(note, res) {
+      note.hidden = false;
+      if (res.error) { note.innerHTML = `error: ${esc(res.error)}`; return; }
+      const qs = (res.likely_questions || []).map((q) => `• ${esc(q)}`).join('\n');
+      const matches = (res.story_matches || [])
+        .map((m) => `— ${esc(m.question)}\n   using story ${esc(m.id)}: ${esc(m.angle)}`).join('\n\n');
+      const gaps = (res.gaps || []).map((g) => `• ${esc(g)}`).join('\n');
+      const ask = (res.questions_to_ask || []).map((a) => `• ${esc(a)}`).join('\n');
+      note.innerHTML =
+        `<b>likely questions</b>\n${qs}\n\n` +
+        `<b>story matches</b>\n${matches || '(none)'}\n\n` +
+        (gaps ? `<b>gaps — no story for these</b>\n${gaps}\n\n` : '') +
+        (ask ? `<b>ask them</b>\n${ask}\n\n` : '') +
+        (res.dropped?.length ? `⚠ dropped ${res.dropped.length} unsourced story ref(s)` : '');
+    }
+
+    el.querySelector('[data-act="prep"]').onclick = async (e) => {
+      const note = el.querySelector('.prep-note');
+      e.target.textContent = 'preparing…'; e.target.disabled = true;
+      const res = await (await fetch(`/api/jobs/${j.id}/prep`, { method:'POST' })).json();
+      e.target.textContent = 'prep interview'; e.target.disabled = false;
+      renderPrep(note, res);
+    };
+
+    el.querySelector('[data-act="last-prep"]')?.addEventListener('click', async () => {
+      const note = el.querySelector('.prep-note');
+      const res = await (await fetch(`/api/jobs/${j.id}/prep`)).json();
+      renderPrep(note, res);
+    });
+
+    el.querySelector('[data-act="timeline"]').onclick = async () => {
+      const note = el.querySelector('.timeline');
+      if (!note.hidden) { note.hidden = true; return; }
+      const events = await (await fetch(`/api/jobs/${j.id}/events`)).json();
+      note.hidden = false;
+      note.innerHTML = events.length
+        ? events.map((ev) => `<div class="timeline-row"><b>${esc(STAGE_LABEL[ev.status] || ev.status)}</b><span>${timeAgo(ev.created_at)}</span>${ev.note ? `<span>— ${esc(ev.note)}</span>` : ''}</div>`).join('')
+        : '<div class="timeline-row">no status changes logged yet</div>';
+    };
+
+    $('#list').append(el);
+  }
+}
+
+$('#status').onchange = load;
+$('#min').onchange = load;
+$('#age').onchange = load;
+$('#logout').onclick = async (e) => {
+  e.preventDefault();
+  await fetch('/api/logout', { method: 'POST' });
+  location.href = '/login.html';
+};
+load();
+</script>
