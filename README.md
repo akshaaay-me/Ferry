@@ -1,4 +1,4 @@
-# job-agent
+# Ferry
 
 Finds jobs, scores them against your actual experience, and writes a tailored resume per posting.
 **It does not apply for you.** Applying stays manual, on purpose.
@@ -209,3 +209,5 @@ in `src/adapters/index.js`. Nothing downstream changes.
   summary rather than a full JD - weaker prefilter signal than the ATS sources. If it
   stops returning jobs, the page markup likely changed; the heuristics live in
   `src/adapters/embeddedjobs.js`.
+# Ferry
+Automates the job hunt: finds postings, filters the noise, preps your resume and interview material per role.
